@@ -1,0 +1,151 @@
+import { Recommendation } from '../types'
+
+interface FinalRecommendationProps {
+  recommendation: Recommendation
+  onStartOver: () => void
+  onAddToCart: () => void
+}
+
+export function FinalRecommendation({ 
+  recommendation, 
+  onStartOver, 
+  onAddToCart 
+}: FinalRecommendationProps) {
+  const { item, recommendedSize, confidence, measurements } = recommendation
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="px-4 py-3">
+          <div className="flex items-center space-x-2 mb-1">
+            <span className="text-sm font-medium text-green-600">Step 6 of 6</span>
+            <span className="text-gray-400">•</span>
+            <span className="text-sm text-gray-500">Complete</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">Your Perfect Fit</h1>
+          <p className="text-sm text-gray-500">Based on your preferences and measurements</p>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="px-4 py-6">
+        <div className="space-y-6">
+          {/* Success Message */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-medium text-green-900">Perfect Match Found!</h3>
+                <p className="text-sm text-green-700">
+                  {Math.round(confidence * 100)}% confidence in this recommendation
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Product Card */}
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="relative">
+              <img
+                src={item.image}
+                alt={item.name}
+                className="w-full h-64 object-cover"
+              />
+              <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                Recommended Size: {recommendedSize}
+              </div>
+            </div>
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                {item.name}
+              </h2>
+              <p className="text-2xl font-bold text-blue-600 mb-4">
+                {item.price}
+              </p>
+              
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Brand</span>
+                  <span className="text-sm font-medium text-gray-900">{item.brand}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Style</span>
+                  <span className="text-sm font-medium text-gray-900">{item.style}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Fit</span>
+                  <span className="text-sm font-medium text-gray-900">{item.subStyle}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Recommended Size</span>
+                  <span className="text-sm font-medium text-blue-600">{recommendedSize}</span>
+                </div>
+              </div>
+
+              {/* Color Options */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-gray-900 mb-2">Available Colors</h3>
+                <div className="flex space-x-2">
+                  {item.colors.map((color, index) => (
+                    <div
+                      key={index}
+                      className="w-8 h-8 rounded-full border-2 border-gray-200"
+                      style={{ backgroundColor: color.toLowerCase() }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Measurements Summary */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Your Measurements Used
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <p className="text-lg font-bold text-gray-900">{measurements.chest}"</p>
+                <p className="text-sm text-gray-500">Chest</p>
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-bold text-gray-900">{measurements.waist}"</p>
+                <p className="text-sm text-gray-500">Waist</p>
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-bold text-gray-900">{measurements.hips}"</p>
+                <p className="text-sm text-gray-500">Hips</p>
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-bold text-gray-900">{measurements.shoulders}"</p>
+                <p className="text-sm text-gray-500">Shoulders</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            <button
+              onClick={onAddToCart}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Add to Cart - {item.price}
+            </button>
+            <button
+              onClick={onStartOver}
+              className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+            >
+              Start Over
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}

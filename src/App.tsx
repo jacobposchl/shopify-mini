@@ -1,35 +1,171 @@
-import {usePopularProducts, ProductCard} from '@shopify/shop-minis-react'
+import { useFlowState } from './hooks/useFlowState'
+import { generateRecommendation } from './utils/recommendationEngine'
+import { CompanySelection } from './components/CompanySelection'
+import { StyleSelection } from './components/StyleSelection'
+import { SubStyleSelection } from './components/SubStyleSelection'
+import { ClothingSelection } from './components/ClothingSelection'
+import { MeasurementsStep } from './components/Measurements'
+import { FinalRecommendation } from './components/FinalRecommendation'
+import { clothingItems } from './data/mockData'
 
 export function App() {
-  return (
-    <div className="pt-12 px-4 pb-6">
-      <h1 className="text-3xl font-bold mb-4 text-center text-blue-600">
-        🎉 Hello Shop Minis!
-      </h1>
-      
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-        <p className="text-green-800 text-center font-medium">
-          ✅ App is working! This is a test message.
-        </p>
-      </div>
-      
-      <div className="space-y-3 text-center">
-        <p className="text-lg text-gray-700">
-          Welcome to your Shopify Mini App
-        </p>
-        <p className="text-sm text-gray-500">
-          If you can see this text, everything is working correctly!
-        </p>
-        <p className="text-xs text-gray-400">
-          Current time: {new Date().toLocaleTimeString()}
-        </p>
-      </div>
-      
-      <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-        <p className="text-blue-700 text-center text-sm">
-          🚀 Ready to build something amazing for the Shopify Mini Hackathon!
-        </p>
-      </div>
-    </div>
-  )
+  const {
+    flowState,
+    selectCompany,
+    selectStyle,
+    selectSubStyle,
+    setMeasurements,
+    setRecommendations,
+    resetFlow,
+    goToNextStep,
+    goToPreviousStep
+  } = useFlowState()
+
+  const handleCompanySelect = (company: any) => {
+    selectCompany(company)
+    goToNextStep()
+  }
+
+  const handleStyleSelect = (style: any) => {
+    selectStyle(style)
+    goToNextStep()
+  }
+
+  const handleSubStyleSelect = (subStyle: any) => {
+    selectSubStyle(subStyle)
+    goToNextStep()
+  }
+
+  const handleItemSelect = (item: any) => {
+    // Find the selected item in our data
+    const selectedItem = clothingItems.find(clothingItem => clothingItem.id === item.id)
+    if (selectedItem) {
+      // Store the selected item for later use
+      setRecommendations([{
+        item: selectedItem,
+        recommendedSize: 'M',
+        confidence: 0.8,
+        measurements: flowState.measurements || {
+          chest: 42,
+          waist: 32,
+          hips: 38,
+          shoulders: 18,
+          armLength: 25,
+          inseam: 32,
+          height: 70,
+          weight: 165
+        }
+      }])
+      goToNextStep()
+    }
+  }
+
+  const handleMeasurementsComplete = (measurements: any) => {
+    setMeasurements(measurements)
+    
+    // Generate recommendation based on selected item and measurements
+    if (flowState.recommendations && flowState.recommendations.length > 0) {
+      const selectedItem = flowState.recommendations[0].item
+      const recommendation = generateRecommendation(selectedItem, measurements)
+      setRecommendations([recommendation])
+    }
+    
+    goToNextStep()
+  }
+
+  const handleStartOver = () => {
+    resetFlow()
+  }
+
+  const handleAddToCart = () => {
+    // In a real app, this would add the item to cart
+    alert('Item added to cart!')
+  }
+
+  // Render the appropriate component based on current step
+  switch (flowState.currentStep) {
+    case 'company-selection':
+      return (
+        <CompanySelection
+          onCompanySelect={handleCompanySelect}
+          selectedCompany={flowState.userPreferences.selectedCompany}
+        />
+      )
+
+    case 'style-selection':
+      return (
+        <StyleSelection
+          onStyleSelect={handleStyleSelect}
+          selectedStyle={flowState.userPreferences.selectedStyle}
+          selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
+        />
+      )
+
+    case 'substyle-selection':
+      return (
+        <SubStyleSelection
+          onSubStyleSelect={handleSubStyleSelect}
+          selectedSubStyle={flowState.userPreferences.selectedSubStyle}
+          selectedStyleId={flowState.userPreferences.selectedStyle?.id}
+          selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
+          selectedStyleName={flowState.userPreferences.selectedStyle?.name}
+        />
+      )
+
+    case 'clothing-selection':
+      return (
+        <ClothingSelection
+          onItemSelect={handleItemSelect}
+          selectedItem={flowState.recommendations?.[0]?.item}
+          selectedCompanyId={flowState.userPreferences.selectedCompany?.id}
+          selectedStyleId={flowState.userPreferences.selectedStyle?.id}
+          selectedSubStyleId={flowState.userPreferences.selectedSubStyle?.id}
+          selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
+          selectedStyleName={flowState.userPreferences.selectedStyle?.name}
+          selectedSubStyleName={flowState.userPreferences.selectedSubStyle?.name}
+        />
+      )
+
+    case 'measurements':
+      return (
+        <MeasurementsStep
+          onMeasurementsComplete={handleMeasurementsComplete}
+          selectedItemName={flowState.recommendations?.[0]?.item.name}
+          selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
+          selectedStyleName={flowState.userPreferences.selectedStyle?.name}
+          selectedSubStyleName={flowState.userPreferences.selectedSubStyle?.name}
+        />
+      )
+
+    case 'final-recommendation':
+      return flowState.recommendations && flowState.recommendations.length > 0 ? (
+        <FinalRecommendation
+          recommendation={flowState.recommendations[0]}
+          onStartOver={handleStartOver}
+          onAddToCart={handleAddToCart}
+        />
+      ) : (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-gray-900 mb-2">Loading...</h1>
+            <p className="text-gray-500">Preparing your recommendation</p>
+          </div>
+        </div>
+      )
+
+    default:
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h1>
+            <button
+              onClick={resetFlow}
+              className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+            >
+              Start Over
+            </button>
+          </div>
+        </div>
+      )
+  }
 }
