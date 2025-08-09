@@ -4,38 +4,38 @@ export const companies: Company[] = [
   {
     id: 'nike',
     name: 'Nike',
-    logo: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
-    description: 'Just Do It - Athletic performance wear'
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/f5/e8/6b/f5e86b54-5abc-248c-66c4-b3df20f8c691/AppIcon-0-0-1x_U007ephone-0-1-0-85-220.png/1200x600wa.png',
+    description: ''
   },
   {
     id: 'adidas',
     name: 'Adidas',
-    logo: 'https://images.unsplash.com/photo-1543508282-6319a3e2621f?w=200&h=200&fit=crop',
-    description: 'Impossible is Nothing - Sportswear and lifestyle'
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/df/26/cf/df26cf2c-2980-1ebc-7354-064751cd3adc/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x630wa.png',
+    description: ''
   },
   {
     id: 'under-armour',
     name: 'Under Armour',
-    logo: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=200&h=200&fit=crop',
-    description: 'The Only Way Is Through - Performance gear'
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/8e/2e/f6/8e2ef607-663f-696f-d908-a54f0d5fdd5b/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
+    description: ''
   },
   {
     id: 'lululemon',
     name: 'Lululemon',
-    logo: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=200&h=200&fit=crop',
-    description: 'Technical athletic apparel for yoga and fitness'
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/9b/21/95/9b2195e9-e161-270a-9a8f-da0e87c7a366/AppIcon-1x_U007emarketing-0-0-0-6-0-0-sRGB-85-220-0.png/1200x630wa.png',
+    description: ''
   },
   {
     id: 'uniqlo',
     name: 'Uniqlo',
-    logo: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop',
-    description: 'LifeWear - Simple, quality clothing'
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/5c/fa/84/5cfa8485-4acd-7517-1234-413a6ce2a44f/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
+    description: ''
   },
   {
     id: 'h-m',
     name: 'H&M',
-    logo: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=200&h=200&fit=crop',
-    description: 'Fashion and quality at the best price'
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/44/02/c2/4402c2d0-c62f-b817-1287-63a91581c8dd/AppIcon-0-0-1x_U007emarketing-0-8-0-0-85-220.png/1200x600wa.png',
+    description: ''
   }
 ]
 
@@ -44,37 +44,37 @@ export const styles: Style[] = [
     id: 'shirts',
     name: 'Shirts',
     icon: '👕',
-    description: 'Tops and upper body clothing'
+    border: {
+      color: '#000000',
+      width: 2
+    }
   },
   {
     id: 'pants',
     name: 'Pants',
     icon: '👖',
-    description: 'Bottoms and lower body clothing'
+    border: {
+      color: '#000000',
+      width: 2
+    }
   },
   {
     id: 'shorts',
     name: 'Shorts',
     icon: '🩳',
-    description: 'Short bottoms for casual and athletic wear'
+    border: {
+      color: '#000000',
+      width: 2
+    }
   },
   {
     id: 'jackets',
     name: 'Jackets',
     icon: '🧥',
-    description: 'Outerwear and layering pieces'
-  },
-  {
-    id: 'dresses',
-    name: 'Dresses',
-    icon: '👗',
-    description: 'One-piece garments'
-  },
-  {
-    id: 'activewear',
-    name: 'Activewear',
-    icon: '🏃‍♀️',
-    description: 'Performance and athletic clothing'
+    border: {
+      color: '#000000',
+      width: 2
+    }
   }
 ]
 
