@@ -44,37 +44,37 @@ export const styles: Style[] = [
     id: 'shirts',
     name: 'Shirts',
     icon: '👕',
-    description: 'Tops and upper body clothing'
+    border: {
+      color: '#000000',
+      width: 2
+    }
   },
   {
     id: 'pants',
     name: 'Pants',
     icon: '👖',
-    description: 'Bottoms and lower body clothing'
+    border: {
+      color: '#000000',
+      width: 2
+    }
   },
   {
     id: 'shorts',
     name: 'Shorts',
     icon: '🩳',
-    description: 'Short bottoms for casual and athletic wear'
+    border: {
+      color: '#000000',
+      width: 2
+    }
   },
   {
     id: 'jackets',
     name: 'Jackets',
     icon: '🧥',
-    description: 'Outerwear and layering pieces'
-  },
-  {
-    id: 'dresses',
-    name: 'Dresses',
-    icon: '👗',
-    description: 'One-piece garments'
-  },
-  {
-    id: 'activewear',
-    name: 'Activewear',
-    icon: '🏃‍♀️',
-    description: 'Performance and athletic clothing'
+    border: {
+      color: '#000000',
+      width: 2
+    }
   }
 ]
 
