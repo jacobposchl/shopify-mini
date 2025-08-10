@@ -139,7 +139,6 @@ export function App() {
             selectedStyleName={flowState.userPreferences.selectedStyle?.name}
             selectedSubStyleName={flowState.userPreferences.selectedSubStyle?.name}
             selectedStyleId={flowState.userPreferences.selectedStyle?.id}
-            onBack={handleBack}
           />
         )
 

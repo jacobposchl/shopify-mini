@@ -1,9 +1,8 @@
-import React from 'react'
-import { MeasurementValidation, PoseConfidenceRequirement } from '../types'
+
+import { MeasurementValidation } from '../types'
 
 interface ConfidenceThresholdProps {
   validation: MeasurementValidation
-  requirements: PoseConfidenceRequirement[]
   isVisible: boolean
   poseStability?: {
     isStable: boolean
@@ -14,7 +13,6 @@ interface ConfidenceThresholdProps {
 
 export function ConfidenceThreshold({ 
   validation, 
-  requirements, 
   isVisible,
   poseStability
 }: ConfidenceThresholdProps) {

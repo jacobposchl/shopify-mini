@@ -5,7 +5,7 @@ import {
   PoseResults 
 } from '../types'
 import { getPoseRequirements } from '../data/poseRequirements'
-import { Logger } from '../utils/Logger'
+
 
 interface UsePoseValidationProps {
   poseResults: PoseResults | null

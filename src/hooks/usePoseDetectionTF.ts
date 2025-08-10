@@ -44,7 +44,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
   const selectedStyleIdRef = useRef<string | null>(null)
   const stabilityStartTimeRef = useRef<number>(0)
   const consecutiveStableFramesRef = useRef<number>(0)
-  const requiredStableFramesRef = useRef<number>(30) // Require 30 stable frames (about 1 second at 30fps)
+
 
   // Function to get required stable frames based on threshold
   const getRequiredStableFrames = useCallback((threshold: number): number => {

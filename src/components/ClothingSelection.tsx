@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { ClothingItem } from '../types'
 import { clothingItems } from '../data/mockData'
 

@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Measurements, MeasurementValidation } from '../types'
-import { usePoseDetectionTF, POSENET_KEYPOINTS } from '../hooks/usePoseDetectionTF'
+import { usePoseDetectionTF } from '../hooks/usePoseDetectionTF'
 import { usePoseValidation } from '../hooks/usePoseValidation'
 import { Logger } from '../utils/Logger'
 
@@ -211,10 +211,8 @@ export function MeasurementsStepImpl({
     startDetection,
     stopDetection,
     cleanup,
-    getHealthStatus,
     poseStability,
-    setSelectedStyle,
-    resetPoseStability
+    setSelectedStyle
   } = usePoseDetectionTF(10)
 
   // Pose validation hook for confidence thresholds
@@ -269,6 +267,7 @@ export function MeasurementsStepImpl({
       
       return () => clearTimeout(timer)
     }
+    return undefined
   }, [poseStability, isProcessing, onAutoProgress])
 
   // Log component initialization
@@ -279,20 +278,10 @@ export function MeasurementsStepImpl({
       style: selectedStyleName,
       subStyle: selectedSubStyleName
     })
+    return undefined
   }, [selectedItemName, selectedCompanyName, selectedStyleName, selectedSubStyleName])
 
-  const headIndex = useMemo(() => {
-    if (!Array.isArray(POSENET_KEYPOINTS)) return 0
-    const wanted = ['nose', 'head', 'face', 'left_eye', 'right_eye', 'lefteye', 'righteye']
-    const idx = POSENET_KEYPOINTS.findIndex(k =>
-      typeof k === 'string' && wanted.some(w => k.toLowerCase().includes(w))
-    )
-    Logger.debug('HEAD_INDEX calculated', { 
-      index: idx >= 0 ? idx : 0, 
-      keypoints: POSENET_KEYPOINTS 
-    })
-    return idx >= 0 ? idx : 0
-  }, [])
+
 
   // Sync canvas size and position to match video
   const syncCanvasToVideo = useCallback(() => {
@@ -438,36 +427,237 @@ export function MeasurementsStepImpl({
       }
     })
 
+    // Draw measurement overlay if measurements are available
+    if (measurements && selectedStyleId) {
+      // Define measurement connections and their labels based on clothing type
+      const getMeasurementConnections = () => {
+        const connections: Array<{
+          indices: [number, number]
+          label: string
+          value: string
+          description: string
+        }> = []
+
+        switch (selectedStyleId) {
+          case 'shirts':
+            // Shoulder width (left shoulder to right shoulder)
+            connections.push({
+              indices: [5, 6], // leftShoulder, rightShoulder
+              label: 'Shoulder Width',
+              value: `${measurements.shoulders}"`,
+              description: 'Distance between shoulder points'
+            })
+            // Body length (nose to hip center)
+            connections.push({
+              indices: [0, 11], // nose to leftHip (approximate)
+              label: 'Body Length',
+              value: `${measurements.chest}"`,
+              description: 'Upper body length'
+            })
+            // Arm length (shoulder to elbow to wrist)
+            connections.push({
+              indices: [5, 7], // leftShoulder to leftElbow
+              label: 'Arm Length',
+              value: `${measurements.armLength}"`,
+              description: 'Shoulder to elbow'
+            })
+            break
+
+          case 'pants':
+            // Hip width (left hip to right hip)
+            connections.push({
+              indices: [11, 12], // leftHip, rightHip
+              label: 'Hip Width',
+              value: `${measurements.hips}"`,
+              description: 'Distance between hip points'
+            })
+            // Leg length (hip to knee to ankle)
+            connections.push({
+              indices: [11, 13], // leftHip to leftKnee
+              label: 'Leg Length',
+              value: `${measurements.inseam}"`,
+              description: 'Hip to knee'
+            })
+            // Waist measurement
+            connections.push({
+              indices: [5, 11], // leftShoulder to leftHip (approximate waist)
+              label: 'Waist',
+              value: `${measurements.waist}"`,
+              description: 'Waist circumference'
+            })
+            break
+
+          case 'shorts':
+            // Hip width (left hip to right hip)
+            connections.push({
+              indices: [11, 12], // leftHip, rightHip
+              label: 'Hip Width',
+              value: `${measurements.hips}"`,
+              description: 'Distance between hip points'
+            })
+            // Thigh length (hip to knee)
+            connections.push({
+              indices: [11, 13], // leftHip to leftKnee
+              label: 'Thigh Length',
+              value: `${measurements.inseam}"`,
+              description: 'Hip to knee'
+            })
+            break
+
+          case 'jackets':
+            // Shoulder width (left shoulder to right shoulder)
+            connections.push({
+              indices: [5, 6], // leftShoulder, rightShoulder
+              label: 'Shoulder Width',
+              value: `${measurements.shoulders}"`,
+              description: 'Distance between shoulder points'
+            })
+            // Body length (nose to hip center)
+            connections.push({
+              indices: [0, 11], // nose to leftHip (approximate)
+              label: 'Body Length',
+              value: `${measurements.chest}"`,
+              description: 'Upper body length'
+            })
+            // Arm length (shoulder to elbow)
+            connections.push({
+              indices: [5, 7], // leftShoulder to leftElbow
+              label: 'Arm Length',
+              value: `${measurements.armLength}"`,
+              description: 'Shoulder to elbow'
+            })
+            break
+
+          case 'activewear':
+            // Shoulder width (left shoulder to right shoulder)
+            connections.push({
+              indices: [5, 6], // leftShoulder, rightShoulder
+              label: 'Shoulder Width',
+              value: `${measurements.shoulders}"`,
+              description: 'Distance between shoulder points'
+            })
+            // Hip width (left hip to right hip)
+            connections.push({
+              indices: [11, 12], // leftHip, rightHip
+              label: 'Hip Width',
+              value: `${measurements.hips}"`,
+              description: 'Distance between hip points'
+            })
+            // Body length (shoulder to hip)
+            connections.push({
+              indices: [5, 11], // leftShoulder to leftHip
+              label: 'Body Length',
+              value: `${measurements.chest}"`,
+              description: 'Shoulder to hip'
+            })
+            break
+
+          default:
+            // Default connections for unknown clothing types
+            connections.push({
+              indices: [5, 6], // leftShoulder, rightShoulder
+              label: 'Shoulder Width',
+              value: `${measurements.shoulders}"`,
+              description: 'Distance between shoulder points'
+            })
+            connections.push({
+              indices: [11, 12], // leftHip, rightHip
+              label: 'Hip Width',
+              value: `${measurements.hips}"`,
+              description: 'Distance between hip points'
+            })
+        }
+
+        return connections
+      }
+
+      const measurementConnections = getMeasurementConnections()
+
+      // Draw measurement text for each connection
+      measurementConnections.forEach(({ indices, label, value, description }) => {
+        const [index1, index2] = indices
+        const landmark1 = poseResults.landmarks[index1]
+        const landmark2 = poseResults.landmarks[index2]
+
+        if (landmark1 && landmark2 && 
+            landmark1.confidence > 0.3 && landmark2.confidence > 0.3) {
+          
+          // Transform coordinates from video space to canvas space
+          const x1 = canvas.width - ((landmark1.x * scale) + offsetX)
+          const y1 = (landmark1.y * scale) + offsetY
+          const x2 = canvas.width - ((landmark2.x * scale) + offsetX)
+          const y2 = (landmark2.y * scale) + offsetY
+
+          // Calculate midpoint of the connection
+          const midX = (x1 + x2) / 2
+          const midY = (y1 + y2) / 2
+
+          // Calculate the angle of the connection for text orientation
+          const angle = Math.atan2(y2 - y1, x2 - x1)
+
+          // Save context for rotation
+          ctx.save()
+          
+          // Move to midpoint and rotate
+          ctx.translate(midX, midY)
+          ctx.rotate(angle)
+
+          // Draw background rectangle for text
+          const textWidth = ctx.measureText(`${label}: ${value}`).width
+          const textHeight = 20
+          const padding = 8
+          
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+          ctx.fillRect(
+            -textWidth / 2 - padding, 
+            -textHeight / 2 - padding, 
+            textWidth + padding * 2, 
+            textHeight + padding * 2
+          )
+
+          // Draw border
+          ctx.strokeStyle = '#00ff00'
+          ctx.lineWidth = 2
+          ctx.strokeRect(
+            -textWidth / 2 - padding, 
+            -textHeight / 2 - padding, 
+            textWidth + padding * 2, 
+            textHeight + padding * 2
+          )
+
+          // Draw text
+          ctx.fillStyle = '#ffffff'
+          ctx.font = 'bold 12px Arial'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(`${label}: ${value}`, 0, 0)
+
+          // Draw description below
+          ctx.font = '10px Arial'
+          ctx.fillStyle = '#cccccc'
+          ctx.fillText(description, 0, 15)
+
+          // Restore context
+          ctx.restore()
+
+          // Draw a small indicator dot at the midpoint
+          ctx.fillStyle = '#00ff00'
+          ctx.beginPath()
+          ctx.arc(midX, midY, 4, 0, 2 * Math.PI)
+          ctx.fill()
+        }
+      })
+    }
+
     Logger.debug('Drew pose landmarks', {
       keypoints: poseResults.landmarks.length,
       scale,
       offsetX,
       offsetY
     })
-  }, [poseResults])
+  }, [poseResults, measurements, selectedStyleId])
 
-  const forceStartDetection = useCallback(() => {
-    Logger.info('Manual detection restart triggered')
-    if (!isPoseInitialized) {
-      Logger.warn('Cannot force start: Pose not initialized yet')
-      return
-    }
-    if (!videoRef.current && !isDemoMode) {
-      Logger.warn('Cannot force start: No video element')
-      return
-    }
-    try {
-      stopDetection()
-      Logger.info('Restarting pose detection...')
-      startDetection().then(() => {
-        Logger.info('Pose detection manually restarted successfully')
-      }).catch((err: Error) => {
-        Logger.error('Manual detection restart failed', { error: err.message })
-      })
-    } catch (err) {
-      Logger.error('Manual detection restart error', { error: (err as Error).message })
-    }
-  }, [isPoseInitialized, stopDetection, startDetection, isDemoMode])
+
 
   // Demo mode activation
   const enableDemoMode = useCallback(() => {
@@ -747,23 +937,7 @@ export function MeasurementsStepImpl({
     startCamera()
   }
 
-  const debugCameraStatus = () => {
-    const video = videoRef.current;
-    const stream = video?.srcObject as MediaStream;
-    
-    console.log('Camera Debug:', {
-      hasVideo: !!video,
-      hasStream: !!stream,
-      streamActive: stream?.active,
-      tracks: stream?.getTracks().map(track => ({
-        kind: track.kind,
-        enabled: track.enabled,
-        readyState: track.readyState
-      })),
-      videoPlaying: !video?.paused,
-      videoDimensions: `${video?.videoWidth}x${video?.videoHeight}`
-    });
-  };
+
 
 
 
@@ -863,7 +1037,6 @@ export function MeasurementsStepImpl({
         {/* Confidence Threshold Component - Top UI */}
         <ConfidenceThreshold
           validation={validation}
-          requirements={[]}
           isVisible={Boolean(!isDemoMode && !measurements && !isProcessing && selectedStyleId && poseResults?.isDetected)}
           poseStability={poseStability}
         />

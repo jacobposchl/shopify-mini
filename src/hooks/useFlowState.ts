@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { FlowState, FlowStep, UserPreferences, Company, Style, SubStyle, Measurements, Recommendation } from '../types'
+import { FlowState, FlowStep, Company, Style, SubStyle, Measurements, Recommendation } from '../types'
 
 const initialFlowState: FlowState = {
   currentStep: 'company-selection',

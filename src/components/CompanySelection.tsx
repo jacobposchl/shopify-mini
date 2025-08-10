@@ -1,5 +1,5 @@
 // src/components/CompanySelection.tsx
-import React from 'react'
+
 import { Card } from '@shopify/shop-minis-react'
 import { Company } from '../types'
 import { companies } from '../data/mockData'
