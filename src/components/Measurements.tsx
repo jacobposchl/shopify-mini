@@ -174,6 +174,7 @@ function GlobalErrorHooks() {
 interface MeasurementsStepProps {
   onMeasurementsComplete: (measurements: Measurements) => void
   onAutoProgress: () => void
+  onCancel: () => void
   selectedItemName?: string
   selectedCompanyName?: string
   selectedStyleName?: string
@@ -184,6 +185,7 @@ interface MeasurementsStepProps {
 export function MeasurementsStepImpl({
   onMeasurementsComplete,
   onAutoProgress,
+  onCancel,
   selectedItemName,
   selectedCompanyName,
   selectedStyleName,
@@ -1348,14 +1350,22 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="px-4 py-3">
-          <div className="flex items-center space-x-2 mb-1">
-            <span className="text-sm text-gray-500">{selectedCompanyName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm text-gray-500">{selectedStyleName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm text-gray-500">{selectedSubStyleName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm font-medium text-blue-600">Step 5 of 6</span>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500">{selectedCompanyName}</span>
+              <span className="text-gray-400">•</span>
+              <span className="text-sm text-gray-500">{selectedStyleName}</span>
+              <span className="text-gray-400">•</span>
+              <span className="text-sm text-gray-500">{selectedSubStyleName}</span>
+              <span className="text-gray-400">•</span>
+              <span className="text-sm font-medium text-blue-600">Step 5 of 6</span>
+            </div>
+            <button
+              onClick={onCancel}
+              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1 rounded-md hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
           </div>
           <h1 className="text-xl font-bold text-gray-900">Get Your Measurements</h1>
           <p className="text-sm text-gray-500">
@@ -1373,25 +1383,6 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
           poseStability={poseStability}
         />
 
-        {/* Enhanced debug overlay */}
-        {!isDemoMode && !measurements && !isProcessing && (
-          <div className="absolute top-20 right-4 z-20 bg-black/90 text-white text-xs p-3 rounded max-w-52">
-            <div className="font-mono space-y-1">
-              <div>Valid: {validation?.isValid ? '✅' : '❌'}</div>
-              <div>Prog: {Math.round((validation?.progress || 0) * 100)}%</div>
-              <div>≥100: {(validation?.progress || 0) >= 1.0 ? '✅' : '❌'}</div>
-              <div>Stable: {poseStability?.isStable ? '✅' : '❌'}</div>
-              <div>Buffer: {debugBufferSize} samples</div>
-              <div className="border-t border-gray-600 pt-1 mt-1">
-                <div>Effect runs: {debugEffectCount}</div>
-                <div>Should trigger: {validation?.progress >= 1.0 ? '🔥 YES' : '❌ NO'}</div>
-                <div>Auto triggered: {debugAutoTrigger ? '✅' : '❌'}</div>
-                <div>Using averaged: {debugBufferSize > 0 ? '✅' : '❌'}</div>
-                {debugError && <div className="text-red-400">Error: {debugError}</div>}
-              </div>
-            </div>
-          </div>
-        )}
 
         {isDemoMode ? (
           // Demo mode UI
