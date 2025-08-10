@@ -48,7 +48,7 @@ export function MeasurementsStep({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="px-4 py-3">
@@ -151,7 +151,7 @@ export function MeasurementsStep({
 
                 <button
                   onClick={handleContinue}
-                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                  className="w-full bg-white text-black py-3 px-4 rounded-lg font-medium border border-gray-300 hover:bg-gray-50 active:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-black/10 transition-colors"
                 >
                   Continue to Recommendations
                 </button>

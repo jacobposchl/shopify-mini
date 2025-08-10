@@ -80,36 +80,34 @@ export const styles: Style[] = [
 
 export const subStyles: SubStyle[] = [
   // Shirts
-  { id: 'crew-neck', name: 'Crew Neck', description: 'Classic round neckline', styleId: 'shirts' },
-  { id: 'v-neck', name: 'V-Neck', description: 'V-shaped neckline', styleId: 'shirts' },
-  { id: 'button-down', name: 'Button Down', description: 'Collared with buttons', styleId: 'shirts' },
-  { id: 'polo', name: 'Polo', description: 'Collared with short sleeves', styleId: 'shirts' },
-  { id: 'tank-top', name: 'Tank Top', description: 'Sleeveless top', styleId: 'shirts' },
-  
+  { id: 'crew-neck',   name: 'Crew Neck',   styleId: 'shirts' },
+  { id: 'v-neck',      name: 'V-Neck',      styleId: 'shirts' },
+  { id: 'button-down', name: 'Button Down', styleId: 'shirts' },
+  { id: 'polo',        name: 'Polo',        styleId: 'shirts' },
+
   // Pants
-  { id: 'jeans', name: 'Jeans', description: 'Denim pants', styleId: 'pants' },
-  { id: 'chinos', name: 'Chinos', description: 'Casual cotton pants', styleId: 'pants' },
-  { id: 'joggers', name: 'Joggers', description: 'Athletic-style pants', styleId: 'pants' },
-  { id: 'dress-pants', name: 'Dress Pants', description: 'Formal trousers', styleId: 'pants' },
-  { id: 'leggings', name: 'Leggings', description: 'Fitted athletic pants', styleId: 'pants' },
-  
+  { id: 'jeans',       name: 'Jeans',       styleId: 'pants' },
+  { id: 'joggers',     name: 'Joggers',     styleId: 'pants' },
+  { id: 'dress-pants', name: 'Dress Pants', styleId: 'pants' },
+  { id: 'leggings',    name: 'Leggings',    styleId: 'pants' },
+
   // Shorts
-  { id: 'athletic-shorts', name: 'Athletic Shorts', description: 'Performance shorts', styleId: 'shorts' },
-  { id: 'casual-shorts', name: 'Casual Shorts', description: 'Everyday shorts', styleId: 'shorts' },
-  { id: 'dress-shorts', name: 'Dress Shorts', description: 'Formal shorts', styleId: 'shorts' },
-  
+  { id: 'athletic-shorts', name: 'Athletic Shorts', styleId: 'shorts' },
+  { id: 'casual-shorts',   name: 'Casual Shorts',   styleId: 'shorts' },
+  { id: 'dress-shorts',    name: 'Dress Shorts',    styleId: 'shorts' },
+
   // Jackets
-  { id: 'hoodie', name: 'Hoodie', description: 'Hooded sweatshirt', styleId: 'jackets' },
-  { id: 'blazer', name: 'Blazer', description: 'Formal jacket', styleId: 'jackets' },
-  { id: 'windbreaker', name: 'Windbreaker', description: 'Lightweight jacket', styleId: 'jackets' },
-  
+  { id: 'hoodie',      name: 'Hoodie',      styleId: 'jackets' },
+  { id: 'blazer',      name: 'Blazer',      styleId: 'jackets' },
+  { id: 'windbreaker', name: 'Windbreaker', styleId: 'jackets' },
+
   // Dresses
-  { id: 'casual-dress', name: 'Casual Dress', description: 'Everyday dress', styleId: 'dresses' },
-  { id: 'formal-dress', name: 'Formal Dress', description: 'Special occasion dress', styleId: 'dresses' },
-  
+  { id: 'casual-dress', name: 'Casual Dress', styleId: 'dresses' },
+  { id: 'formal-dress', name: 'Formal Dress', styleId: 'dresses' },
+
   // Activewear
-  { id: 'compression', name: 'Compression', description: 'Tight-fitting performance wear', styleId: 'activewear' },
-  { id: 'loose-fit', name: 'Loose Fit', description: 'Comfortable athletic wear', styleId: 'activewear' }
+  { id: 'compression', name: 'Compression', styleId: 'activewear' },
+  { id: 'loose-fit',   name: 'Loose Fit',   styleId: 'activewear' },
 ]
 
 export const clothingItems: ClothingItem[] = [

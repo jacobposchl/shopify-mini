@@ -9,7 +9,7 @@ interface StyleSelectionProps {
 
 export function StyleSelection({ onStyleSelect, selectedStyle, selectedCompanyName }: StyleSelectionProps) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="px-4 py-3">
@@ -38,7 +38,7 @@ export function StyleSelection({ onStyleSelect, selectedStyle, selectedCompanyNa
             >
               <div className="p-6 text-center">
                 <div className="text-4xl mb-3">{style.icon}</div>
-                <h3 className="font-semibold text-gray-900 text-lg mb-2">
+                <h3 className="font-semibold text-gray-900 text-xl md:text-2xl leading-tight mb-1">
                   {style.name}
                 </h3>
                 <p className="text-sm text-gray-500">

@@ -1,12 +1,18 @@
 @import "@shopify/shop-minis-react/styles";
 
+
+html, body, #root { height: 100%; }
+body { background: #550cff; }
+
 .ios-app-tile {
   border-radius: 22%;
   overflow: hidden;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   aspect-ratio: 1;
   width: 100%;
-  max-width: 120px;
+  /* bump or remove this cap */
+  /* max-width: 120px; */
+  max-width: 180px; /* try 160–200px for iPhone 13 */
   background: white;
 }
 

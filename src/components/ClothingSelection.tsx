@@ -55,7 +55,7 @@ export function ClothingSelection({
   const displayItems = filteredItems.length > 0 ? filteredItems : clothingItems
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="px-4 py-3">
