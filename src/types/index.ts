@@ -20,8 +20,9 @@ export interface Style {
 export interface SubStyle {
   id: string
   name: string
-  description: string
-  styleId: string // references Style.id
+  styleId: string
+  description?: string      // ← make optional (prevents TS errors)
+  iconUrl?: string          // ← add this
 }
 
 export interface ClothingItem {

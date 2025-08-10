@@ -44,7 +44,7 @@ export const companies: Company[] = [
 // Components read iconUrl with a narrow type/any cast.
 export const styles = [
   { id: 'shirts',  name: 'Shirts',  iconUrl: 'https://cdn-icons-png.flaticon.com/512/392/392043.png'  },
-  { id: 'pants',   name: 'Pants',   iconUrl: 'https://cdn-icons-png.flaticon.com/512/3531/3531748.png' },
+  { id: 'pants',   name: 'Pants',   iconUrl: 'https://cdn-icons-png.flaticon.com/512/808/808726.png' },
   { id: 'shorts',  name: 'Shorts',  iconUrl: 'https://cdn-icons-png.flaticon.com/512/120/120041.png'   },
   { id: 'jackets', name: 'Jackets', iconUrl: 'https://cdn-icons-png.flaticon.com/512/755/755999.png'   },
 ]
@@ -52,27 +52,41 @@ export const styles = [
 // Substyles only for the 4 visible style categories (no dresses/activewear to avoid unreachable options)
 export const subStyles: SubStyle[] = [
   // Shirts
-  { id: 'crew-neck',   name: 'Crew Neck',   styleId: 'shirts' },
-  { id: 'v-neck',      name: 'V-Neck',      styleId: 'shirts' },
-  { id: 'button-down', name: 'Button Down', styleId: 'shirts' },
-  { id: 'polo',        name: 'Polo',        styleId: 'shirts' },
+  { id: 'crew-neck',   name: 'Crew Neck',   styleId: 'shirts',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/3126/3126092.png' },
+  { id: 'v-neck',      name: 'V-Neck',      styleId: 'shirts',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2348/2348168.png' },
+  { id: 'button-down', name: 'Button Down', styleId: 'shirts',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/343/343225.png' },
+  { id: 'polo',        name: 'Polo',        styleId: 'shirts',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1363/1363167.png' },
 
   // Pants
-  { id: 'jeans',       name: 'Jeans',       styleId: 'pants' },
-  { id: 'joggers',     name: 'Joggers',     styleId: 'pants' },
-  { id: 'dress-pants', name: 'Dress Pants', styleId: 'pants' },
-  { id: 'leggings',    name: 'Leggings',    styleId: 'pants' },
+  { id: 'jeans',       name: 'Jeans',       styleId: 'pants',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/5258/5258152.png' },
+  { id: 'joggers',     name: 'Joggers',     styleId: 'pants',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/6649/6649502.png' },
+  { id: 'dress-pants', name: 'Dress Pants', styleId: 'pants',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/88/88795.png' },
+  { id: 'leggings',    name: 'Leggings',    styleId: 'pants',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2589/2589977.png' },
 
   // Shorts
-  { id: 'athletic-shorts', name: 'Athletic Shorts', styleId: 'shorts' },
-  { id: 'casual-shorts',   name: 'Casual Shorts',   styleId: 'shorts' },
-  { id: 'dress-shorts',    name: 'Dress Shorts',    styleId: 'shorts' },
+  { id: 'athletic-shorts', name: 'Athletic Shorts', styleId: 'shorts',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/27/27146.png' },
+  { id: 'casual-shorts',   name: 'Casual Shorts',   styleId: 'shorts',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/941/941430.png' },
 
   // Jackets
-  { id: 'hoodie',      name: 'Hoodie',      styleId: 'jackets' },
-  { id: 'blazer',      name: 'Blazer',      styleId: 'jackets' },
-  { id: 'windbreaker', name: 'Windbreaker', styleId: 'jackets' },
+  { id: 'hoodie',      name: 'Hoodie',      styleId: 'jackets',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/343/343247.png' },
+  { id: 'blazer',      name: 'Blazer',      styleId: 'jackets',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2589/2589938.png' },
+  { id: 'windbreaker', name: 'Windbreaker', styleId: 'jackets',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/614/614281.png' },
+
 ]
+
 
 // Helper for consistent dummy data
 const img = (q: string) =>
