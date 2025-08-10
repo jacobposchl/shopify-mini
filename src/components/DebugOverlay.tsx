@@ -1,171 +1,328 @@
 // src/components/DebugOverlay.tsx
-import React, { useState, useEffect } from 'react';
-import { Logger } from '../utils/Logger';
+import React, { useState, useEffect } from 'react'
+import { Logger } from '../utils/Logger'
 
-export const DebugOverlay: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [logs, setLogs] = useState(Logger.getLogs());
+interface DebugOverlayProps {
+  isVisible: boolean
+  onClose: () => void
+  poseDetectionStatus: {
+    isInitialized: boolean
+    isLoading: boolean
+    error: string
+    poseResults: any
+  }
+  cameraStatus: {
+    isActive: boolean
+    error: string | null
+    stream: MediaStream | null
+  }
+  videoElement: HTMLVideoElement | null
+}
+
+export function DebugOverlay({
+  isVisible,
+  onClose,
+  poseDetectionStatus,
+  cameraStatus,
+  videoElement
+}: DebugOverlayProps) {
+  const [tfBackend, setTfBackend] = useState<string>('Unknown')
+  const [webglInfo, setWebglInfo] = useState<any>(null)
+  const [systemInfo, setSystemInfo] = useState<any>(null)
 
   useEffect(() => {
-    if (isOpen) {
-      // Refresh logs when overlay opens
-      setLogs(Logger.getLogs());
-    }
-  }, [isOpen]);
+    if (isVisible) {
+      // Get TensorFlow.js backend info
+      import('@tensorflow/tfjs').then((tf) => {
+        try {
+          const backend = tf.getBackend()
+          setTfBackend(backend)
+          
+          // Get WebGL info if available
+          if (backend === 'webgl') {
+            const canvas = document.createElement('canvas')
+            const gl = canvas.getContext('webgl')
+            if (gl) {
+              setWebglInfo({
+                maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+                maxViewportDims: gl.getParameter(gl.MAX_VIEWPORT_DIMS),
+                maxRenderbufferSize: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
+                vendor: gl.getParameter(gl.VENDOR),
+                renderer: gl.getParameter(gl.RENDERER),
+                version: gl.getParameter(gl.VERSION)
+              })
+            }
+          }
+        } catch (err) {
+          Logger.error('Failed to get TF.js info:', err)
+        }
+      })
 
-  // Only show in development or when you need it
-  if (process.env.NODE_ENV === 'production') return null;
+      // Get system info
+      setSystemInfo({
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        cookieEnabled: navigator.cookieEnabled,
+        onLine: navigator.onLine,
+        deviceMemory: (navigator as any).deviceMemory,
+        hardwareConcurrency: navigator.hardwareConcurrency,
+        maxTouchPoints: navigator.maxTouchPoints
+      })
+    }
+  }, [isVisible])
+
+  if (!isVisible) return null
 
   return (
-    <>
-      {/* Floating Debug Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          width: '60px',
-          height: '60px',
-          borderRadius: '50%',
-          backgroundColor: '#007AFF',
-          color: 'white',
-          border: 'none',
-          fontSize: '24px',
-          zIndex: 1000,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          cursor: 'pointer',
-        }}
-      >
-        🐛
-      </button>
-
-      {/* Debug Panel */}
-      {isOpen && (
-        <div style={{
-          position: 'fixed',
-          top: '0',
-          left: '0',
-          right: '0',
-          bottom: '0',
-          backgroundColor: 'rgba(0,0,0,0.95)',
-          zIndex: 1001,
-          padding: '20px',
-          color: 'white',
-          fontFamily: 'monospace',
-        }}>
-          {/* Header */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '20px',
-            borderBottom: '1px solid #333',
-            paddingBottom: '10px',
-          }}>
-            <h2 style={{ margin: 0 }}>Debug Logs ({logs.length})</h2>
-            <div>
-              <button
-                onClick={() => {
-                  Logger.clearLogs();
-                  setLogs([]);
-                }}
-                style={{
-                  backgroundColor: '#FF3B30',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '4px',
-                  marginRight: '10px',
-                  cursor: 'pointer',
-                }}
-              >
-                Clear
-              </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                style={{
-                  backgroundColor: '#666',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-gray-900">Debug Information</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+          >
+            ×
+          </button>
+        </div>
+        
+        <div className="p-6 space-y-6">
+          {/* TensorFlow.js Status */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">TensorFlow.js Status</h3>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between">
+                <span>Backend:</span>
+                <span className={`font-mono ${tfBackend === 'webgl' ? 'text-green-600' : 'text-red-600'}`}>
+                  {tfBackend}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Model Initialized:</span>
+                <span className={poseDetectionStatus.isInitialized ? 'text-green-600' : 'text-red-600'}>
+                  {poseDetectionStatus.isInitialized ? '✅ Yes' : '❌ No'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Model Loading:</span>
+                <span className={poseDetectionStatus.isLoading ? 'text-yellow-600' : 'text-gray-600'}>
+                  {poseDetectionStatus.isLoading ? '⏳ Loading...' : 'Idle'}
+                </span>
+              </div>
+              {poseDetectionStatus.error && (
+                <div className="flex justify-between">
+                  <span>Error:</span>
+                  <span className="text-red-600 text-sm max-w-xs text-right">
+                    {poseDetectionStatus.error}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Logs Container */}
-          <div style={{
-            height: 'calc(100% - 80px)',
-            overflowY: 'auto',
-            backgroundColor: '#1a1a1a',
-            padding: '15px',
-            borderRadius: '8px',
-            fontSize: '12px',
-            lineHeight: '1.4',
-          }}>
-            {logs.length === 0 ? (
-              <div style={{ color: '#888', textAlign: 'center', marginTop: '50px' }}>
-                No logs yet. Start using the app to see debug information.
-              </div>
-            ) : (
-              logs.map((log, index) => (
-                <div
-                  key={index}
-                  style={{
-                    marginBottom: '15px',
-                    padding: '10px',
-                    backgroundColor: 
-                      log.level === 'error' ? '#2D1B1B' :
-                      log.level === 'warn' ? '#2D2A1B' :
-                      log.level === 'info' ? '#1B2D2D' :
-                      '#1B1B2D',
-                    borderLeft: `4px solid ${
-                      log.level === 'error' ? '#FF3B30' :
-                      log.level === 'warn' ? '#FF9500' :
-                      log.level === 'info' ? '#007AFF' :
-                      '#5856D6'
-                    }`,
-                    borderRadius: '4px',
-                  }}
-                >
-                  <div style={{
-                    color: 
-                      log.level === 'error' ? '#FF6B6B' :
-                      log.level === 'warn' ? '#FFB84D' :
-                      log.level === 'info' ? '#4DA6FF' :
-                      '#8E8CE6',
-                    fontWeight: 'bold',
-                    marginBottom: '5px',
-                  }}>
-                    [{log.timestamp}] {log.level.toUpperCase()}
-                  </div>
-                  <div style={{ color: '#E0E0E0', marginBottom: log.data ? '8px' : '0' }}>
-                    {log.message}
-                  </div>
-                  {log.data && (
-                    <pre style={{
-                      backgroundColor: '#0a0a0a',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      margin: '0',
-                      fontSize: '11px',
-                      color: '#A0A0A0',
-                      overflow: 'auto',
-                    }}>
-                      {JSON.stringify(log.data, null, 2)}
-                    </pre>
-                  )}
+          {/* WebGL Information */}
+          {webglInfo && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">WebGL Capabilities</h3>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span>Max Texture Size:</span>
+                  <span className="font-mono">{webglInfo.maxTextureSize}</span>
                 </div>
-              ))
-            )}
+                <div className="flex justify-between">
+                  <span>Max Viewport:</span>
+                  <span className="font-mono">{webglInfo.maxViewportDims[0]} × {webglInfo.maxViewportDims[1]}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Max Renderbuffer:</span>
+                  <span className="font-mono">{webglInfo.maxRenderbufferSize}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Vendor:</span>
+                  <span className="font-mono text-sm">{webglInfo.vendor}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Renderer:</span>
+                  <span className="font-mono text-sm">{webglInfo.renderer}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Version:</span>
+                  <span className="font-mono text-sm">{webglInfo.version}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Camera Status */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Camera Status</h3>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between">
+                <span>Camera Active:</span>
+                <span className={cameraStatus.isActive ? 'text-green-600' : 'text-red-600'}>
+                  {cameraStatus.isActive ? '✅ Yes' : '❌ No'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Stream Available:</span>
+                <span className={cameraStatus.stream ? 'text-green-600' : 'text-red-600'}>
+                  {cameraStatus.stream ? '✅ Yes' : '❌ No'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Stream Active:</span>
+                <span className={cameraStatus.stream?.active ? 'text-green-600' : 'text-red-600'}>
+                  {cameraStatus.stream?.active ? '✅ Yes' : '❌ No'}
+                </span>
+              </div>
+              {videoElement && (
+                <>
+                  <div className="flex justify-between">
+                    <span>Video Ready State:</span>
+                    <span className="font-mono">{videoElement.readyState}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Video Dimensions:</span>
+                    <span className="font-mono">
+                      {videoElement.videoWidth} × {videoElement.videoHeight}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Video Playing:</span>
+                    <span className={!videoElement.paused ? 'text-green-600' : 'text-red-600'}>
+                      {!videoElement.paused ? '✅ Yes' : '❌ No'}
+                    </span>
+                  </div>
+                </>
+              )}
+              {cameraStatus.error && (
+                <div className="flex justify-between">
+                  <span>Camera Error:</span>
+                  <span className="text-red-600 text-sm max-w-xs text-right">
+                    {cameraStatus.error}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Pose Detection Results */}
+          {poseDetectionStatus.poseResults && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Pose Detection Results</h3>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span>Pose Detected:</span>
+                  <span className={poseDetectionStatus.poseResults.isDetected ? 'text-green-600' : 'text-red-600'}>
+                    {poseDetectionStatus.poseResults.isDetected ? '✅ Yes' : '❌ No'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Confidence:</span>
+                  <span className="font-mono">
+                    {Math.round((poseDetectionStatus.poseResults.confidence || 0) * 100)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Landmarks:</span>
+                  <span className="font-mono">
+                    {poseDetectionStatus.poseResults.landmarks?.length || 0}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* System Information */}
+          {systemInfo && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">System Information</h3>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span>Platform:</span>
+                  <span className="font-mono text-sm">{systemInfo.platform}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Language:</span>
+                  <span className="font-mono text-sm">{systemInfo.language}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Online:</span>
+                  <span className={systemInfo.onLine ? 'text-green-600' : 'text-red-600'}>
+                    {systemInfo.onLine ? '✅ Yes' : '❌ No'}
+                  </span>
+                </div>
+                {systemInfo.deviceMemory && (
+                  <div className="flex justify-between">
+                    <span>Device Memory:</span>
+                    <span className="font-mono">{systemInfo.deviceMemory} GB</span>
+                  </div>
+                )}
+                {systemInfo.hardwareConcurrency && (
+                  <div className="flex justify-between">
+                    <span>CPU Cores:</span>
+                    <span className="font-mono">{systemInfo.hardwareConcurrency}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span>Touch Points:</span>
+                  <span className="font-mono">{systemInfo.maxTouchPoints}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={async () => {
+                Logger.info('Debug: Testing TensorFlow.js initialization')
+                try {
+                  const tf = await import('@tensorflow/tfjs')
+                  await tf.setBackend('webgl')
+                  await tf.ready()
+                  
+                  const posenet = await import('@tensorflow-models/posenet')
+                  const model = await posenet.load({
+                    architecture: 'MobileNetV1',
+                    outputStride: 16,
+                    inputResolution: { width: 257, height: 257 },
+                    multiplier: 0.5,
+                    quantBytes: 2
+                  })
+                  
+                  alert(`✅ TensorFlow.js test successful!\nBackend: ${tf.getBackend()}\nModel loaded: ${!!model}`)
+                } catch (err) {
+                  alert(`❌ TensorFlow.js test failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+                }
+              }}
+              className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700"
+            >
+              Test TF.js
+            </button>
+            <button
+              onClick={() => {
+                Logger.info('Debug: Copy debug info to clipboard')
+                const debugInfo = {
+                  tfBackend,
+                  webglInfo,
+                  poseDetectionStatus,
+                  cameraStatus,
+                  systemInfo,
+                  timestamp: new Date().toISOString()
+                }
+                navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2))
+                  .then(() => alert('Debug info copied to clipboard'))
+                  .catch(() => alert('Failed to copy debug info'))
+              }}
+              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700"
+            >
+              Copy Debug Info
+            </button>
           </div>
         </div>
-      )}
-    </>
-  );
-};
+      </div>
+    </div>
+  )
+}
