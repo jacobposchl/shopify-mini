@@ -300,11 +300,12 @@ export function MeasurementsStepImpl({
   const [debugEffectCount, setDebugEffectCount] = useState(0);
   const [debugAutoTrigger, setDebugAutoTrigger] = useState(false)
   const [debugError, setDebugError] = useState<string>('')
-
+  const [isPoseDetectionWaiting, setIsPoseDetectionWaiting] = useState(false)
   const [measurementBuffer, setMeasurementBuffer] = useState<Measurements[]>([])
-const [debugBufferSize, setDebugBufferSize] = useState(0)
-
+  const [debugBufferSize, setDebugBufferSize] = useState(0)
   const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null)
+  
 
 
   const {
@@ -1001,7 +1002,28 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
     })
   }, [poseResults, measurements, selectedStyleId])
 
-
+  const checkPoseDetectionStatus = useCallback(() => {
+    // Check if pose detection is currently loading
+    if (isPoseLoading) {
+      Logger.info('Pose detection is still loading...')
+      return 'loading'
+    }
+    
+    // Check if pose detection failed to initialize
+    if (poseError) {
+      Logger.warn('Pose detection has a real error:', poseError)
+      return 'error'
+    }
+    
+    // Check if pose detection is ready
+    if (isPoseInitialized) {
+      Logger.info('Pose detection is ready')
+      return 'ready'
+    }
+    
+    // Default state - not started yet
+    return 'not-started'
+  }, [isPoseLoading, poseError, isPoseInitialized])
 
   // Demo mode activation
   const enableDemoMode = useCallback(() => {
@@ -1172,18 +1194,28 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
         Logger.info('Pose detection started successfully')
       } catch (poseError) {
         const poseErrorMessage = (poseError as Error).message
-        Logger.warn('Pose detection failed, but camera is working', { 
-          error: poseErrorMessage,
-          stack: (poseError as Error).stack
+        Logger.warn('Pose detection initialization failed, checking status...', { 
+          error: poseErrorMessage
         })
-
-        // Don't fail completely if pose detection fails - camera is still working
-        // Just show a warning and continue with basic camera functionality
-        setCameraError(`Camera working but pose detection failed: ${poseErrorMessage}. You can still use manual measurements.`)
+      
+        // Check what's actually happening with pose detection
+        const poseStatus = checkPoseDetectionStatus()
         
-        // Don't enable demo mode immediately - let user see the camera feed
-        // They can manually enable demo mode if needed
-        return
+        if (poseStatus === 'loading') {
+          // Pose detection is still loading - this is not an error!
+          Logger.info('Pose detection is loading, showing loading state')
+          setIsPoseDetectionWaiting(true)
+          setCameraError('') // Clear any previous errors
+          
+          // Set up auto-retry when pose detection becomes ready
+          setupPoseDetectionRetry()
+          return
+        } else {
+          // This is a real error
+          Logger.error('Real pose detection error occurred')
+          setCameraError(`Camera working but pose detection failed: ${poseErrorMessage}. You can still use manual measurements.`)
+          return
+        }
       }
 
     } catch (error) {
@@ -1216,6 +1248,53 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
     }
   }, [syncCanvasToVideo, initializePose, startDetection, enableDemoMode])
 
+
+  const setupPoseDetectionRetry = useCallback(() => {
+    Logger.info('Setting up pose detection auto-retry...')
+    
+    const checkInterval = 500 // Check every 500ms
+    const maxRetries = 60 // Maximum 30 seconds (60 * 500ms)
+    let retryCount = 0
+    
+    const retryTimer = setInterval(async () => {
+      retryCount++
+      const poseStatus = checkPoseDetectionStatus()
+      
+      Logger.debug(`Pose detection retry ${retryCount}/${maxRetries}, status: ${poseStatus}`)
+      
+      if (poseStatus === 'ready' && videoRef.current) {
+        // Pose detection is now ready!
+        Logger.info('Pose detection became ready, attempting to start...')
+        clearInterval(retryTimer)
+        setIsPoseDetectionWaiting(false)
+        
+        try {
+          await startDetection()
+          Logger.info('Pose detection started successfully after retry')
+        } catch (retryError) {
+          Logger.error('Failed to start detection after retry:', retryError)
+          setCameraError('Pose detection failed to start. You can still use manual measurements.')
+        }
+        
+      } else if (poseStatus === 'error' || retryCount >= maxRetries) {
+        // Real error or timeout
+        Logger.warn('Giving up on pose detection retry', { poseStatus, retryCount })
+        clearInterval(retryTimer)
+        setIsPoseDetectionWaiting(false)
+        
+        if (retryCount >= maxRetries) {
+          setCameraError('Pose detection is taking too long to load. You can still use manual measurements.')
+        } else {
+          setCameraError('Pose detection failed to initialize. You can still use manual measurements.')
+        }
+      }
+      
+      // Continue waiting if status is still 'loading' or 'not-started'
+    }, checkInterval)
+    
+    // Store the timer so we can clean it up if needed
+    return retryTimer
+  }, [checkPoseDetectionStatus, startDetection])
 
   const handleTakeMeasurement = () => {
     Logger.info('Taking measurement', {
@@ -1283,6 +1362,13 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
 
     return () => {
       Logger.info('Component unmounting, cleaning up camera and pose detection')
+
+      // Clear retry timer
+      if (retryTimerRef.current) {
+        clearInterval(retryTimerRef.current)
+        retryTimerRef.current = null
+      }
+      
       try {
         stopDetection()
       } catch (err) {
@@ -1374,6 +1460,21 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
         </div>
       </header>
 
+      // Add this loading overlay component definition here
+      const LoadingOverlay = () => (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+          <div className="bg-white bg-opacity-90 rounded-lg p-6 text-center shadow-lg">
+            <div className="flex items-center justify-center mb-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+              <span className="text-lg font-semibold text-gray-800">Loading pose detection...</span>
+            </div>
+            <p className="text-sm text-gray-600">
+              Initializing AI model for automatic measurements
+            </p>
+          </div>
+        </div>
+      )
+      
       {/* Main content area */}
       <main className="relative flex-1 overflow-hidden">
         {/* Confidence Threshold Component - Top UI */}
@@ -1419,6 +1520,10 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
               className="absolute inset-0 pointer-events-none transform z-50"
               style={{ zIndex: 10, transformOrigin: 'center' }}
             />
+
+            {/* NEW: Add the loading overlay here */}
+            {isPoseDetectionWaiting && <LoadingOverlay />}
+
           </>
         )}
 
