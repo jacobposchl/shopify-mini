@@ -17,7 +17,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@fal-ai/client": "^1.6.2",
+    "@fal-ai/client": "1.6.0",
     "@shopify/shop-minis-react": "0.0.30",
     "@tensorflow-models/posenet": "^2.2.2",
     "@tensorflow/tfjs": "^4.22.0",

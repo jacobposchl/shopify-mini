@@ -575,13 +575,8 @@ export function MeasurementsStepImpl({
   }
 
   return (
-<<<<<<< HEAD
-    <div className="min-h-screen">
-      {/* Header */}
-=======
     <div className="min-h-screen flex flex-col bg-black">
       {/* Header stays the same */}
->>>>>>> a455879333ab443d49dd86ea90b5414c2d995620
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="px-4 py-3">
           <div className="flex items-center space-x-2 mb-1">
@@ -706,11 +701,7 @@ export function MeasurementsStepImpl({
                 </button>
                 <button
                   onClick={handleContinue}
-<<<<<<< HEAD
-                  className="w-full bg-white text-black py-3 px-4 rounded-lg font-medium border border-gray-300 hover:bg-gray-50 active:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-black/10 transition-colors"
-=======
                   className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700"
->>>>>>> a455879333ab443d49dd86ea90b5414c2d995620
                 >
                   Continue to Recommendations
                 </button>
