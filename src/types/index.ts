@@ -36,6 +36,35 @@ export interface ClothingItem {
   subStyleId: string
 }
 
+// Pose confidence requirements for different clothing types
+export interface PoseConfidenceRequirement {
+  keypointIndices: number[] // PoseNet keypoint indices (0-16)
+  minConfidence: number // Minimum confidence threshold (0-1)
+  requiredDuration: number // Required duration in milliseconds
+  description: string // Human-readable description
+}
+
+export interface ClothingPoseRequirements {
+  styleId: string // e.g., 'shirts', 'pants'
+  requirements: PoseConfidenceRequirement[]
+}
+
+// Measurement validation status
+export interface MeasurementValidation {
+  isValid: boolean
+  confidence: number // Overall confidence score (0-1)
+  progress: number // Progress towards meeting requirements (0-1)
+  requirements: {
+    [key: string]: {
+      met: boolean
+      progress: number
+      duration: number
+      confidence: number
+    }
+  }
+  message: string
+}
+
 export interface UserPreferences {
   selectedCompany?: Company
   selectedStyle?: Style
