@@ -134,6 +134,7 @@ export function App() {
           <MeasurementsStep
             onMeasurementsComplete={handleMeasurementsComplete}
             onAutoProgress={goToNextStep}
+            onCancel={handleBack}
             selectedItemName={flowState.recommendations?.[0]?.item.name}
             selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
             selectedStyleName={flowState.userPreferences.selectedStyle?.name}

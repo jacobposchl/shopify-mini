@@ -174,6 +174,7 @@ function GlobalErrorHooks() {
 interface MeasurementsStepProps {
   onMeasurementsComplete: (measurements: Measurements) => void
   onAutoProgress: () => void
+  onCancel: () => void
   selectedItemName?: string
   selectedCompanyName?: string
   selectedStyleName?: string
@@ -184,6 +185,7 @@ interface MeasurementsStepProps {
 export function MeasurementsStepImpl({
   onMeasurementsComplete,
   onAutoProgress,
+  onCancel,
   selectedItemName,
   selectedCompanyName,
   selectedStyleName,
@@ -206,6 +208,86 @@ export function MeasurementsStepImpl({
     return distanceInInches.toFixed(1);
   };
 
+  // Calculate actual measurements based on clothing type and pose landmarks
+  const calculateRealMeasurements = (landmarks: any[], scale: number, clothingType: string) => {
+    const measurements: Measurements = {
+      chest: 0,
+      waist: 0, 
+      hips: 0,
+      shoulders: 0,
+      armLength: 0,
+      inseam: 0,
+      height: 70, // Default
+      weight: 165 // Default
+    };
+
+    // Calculate shoulder width (always relevant)
+    if (landmarks[5] && landmarks[6]) { // leftShoulder, rightShoulder
+      measurements.shoulders = parseFloat(calculateDistance(landmarks[5], landmarks[6], scale));
+    }
+
+    // Calculate measurements based on clothing type
+    switch (clothingType) {
+      case 'shirts':
+      case 'jackets':
+        // Chest approximation (shoulder width * 2.3 is typical ratio)
+        measurements.chest = measurements.shoulders * 2.3;
+        
+        // Arm length (shoulder to elbow)
+        if (landmarks[5] && landmarks[7]) { // leftShoulder to leftElbow
+          measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7], scale));
+        }
+        
+        // Waist approximation (slightly smaller than chest)
+        measurements.waist = measurements.chest * 0.85;
+        break;
+
+      case 'pants':
+      case 'shorts':
+        // Hip width
+        if (landmarks[11] && landmarks[12]) { // leftHip, rightHip
+          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12], scale));
+        }
+        
+        // Waist approximation (hip width * 2.2)
+        measurements.waist = measurements.hips * 2.2;
+        
+        // Inseam (hip to knee for shorts, hip to ankle for pants)
+        if (clothingType === 'pants' && landmarks[11] && landmarks[15]) { // leftHip to leftAnkle
+          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15], scale));
+        } else if (clothingType === 'shorts' && landmarks[11] && landmarks[13]) { // leftHip to leftKnee
+          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[13], scale));
+        }
+        break;
+
+      case 'activewear':
+        // Full body measurements
+        measurements.chest = measurements.shoulders * 2.3;
+        measurements.waist = measurements.chest * 0.85;
+        
+        if (landmarks[11] && landmarks[12]) { // Hip width
+          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12], scale));
+        }
+        
+        if (landmarks[5] && landmarks[7]) { // Arm length
+          measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7], scale));
+        }
+        
+        if (landmarks[11] && landmarks[15]) { // Inseam
+          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15], scale));
+        }
+        break;
+
+      default:
+        // Default to basic measurements
+        measurements.chest = measurements.shoulders * 2.3;
+        measurements.waist = measurements.chest * 0.85;
+        measurements.hips = measurements.shoulders * 2.1;
+    }
+
+    return measurements;
+  };
+
   // Your existing code continues here (videoRef, canvasRef, etc.)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -215,6 +297,12 @@ export function MeasurementsStepImpl({
   const [isProcessing, setIsProcessing] = useState(false)
   const [cameraError, setCameraError] = useState<string>('')
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [debugEffectCount, setDebugEffectCount] = useState(0);
+  const [debugAutoTrigger, setDebugAutoTrigger] = useState(false)
+  const [debugError, setDebugError] = useState<string>('')
+
+  const [measurementBuffer, setMeasurementBuffer] = useState<Measurements[]>([])
+const [debugBufferSize, setDebugBufferSize] = useState(0)
 
   const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
 
@@ -256,7 +344,45 @@ export function MeasurementsStepImpl({
     }
   }, [selectedStyleId, setSelectedStyle])
 
+  // Track measurements during validation progression
+  useEffect(() => {
+    // Only track measurements when pose is detected, validation is progressing, and we're stable
+    if (poseResults?.isDetected && 
+        validation && 
+        validation.progress > 0 && 
+        validation.progress < 1.0 && 
+        poseStability?.isStable &&
+        selectedStyleId) {
+      
+      try {
+        const currentMeasurement = calculateRealMeasurements(
+          poseResults.landmarks, 
+          parseFloat(canvasRef.current?.dataset.videoScale || '1'), 
+          selectedStyleId
+        );
+        
+        // Add to buffer (limit buffer size to prevent memory issues)
+        setMeasurementBuffer(prev => {
+          const newBuffer = [...prev, currentMeasurement];
+          // Keep only last 100 measurements (about 10 seconds at 10fps)
+          const limitedBuffer = newBuffer.slice(-100);
+          setDebugBufferSize(limitedBuffer.length);
+          return limitedBuffer;
+        });
+        
+      } catch (error) {
+        setDebugError(`Measurement tracking error: ${(error as Error).message}`);
+      }
+    }
+  }, [poseResults, validation?.progress, poseStability?.isStable, selectedStyleId]);
 
+  // Reset measurement buffer when validation resets
+  useEffect(() => {
+    if (!validation || validation.progress === 0 || !poseStability?.isStable) {
+      setMeasurementBuffer([]);
+      setDebugBufferSize(0);
+    }
+  }, [validation?.progress, poseStability?.isStable]);
 
   // Reset validation when pose becomes unstable
   useEffect(() => {
@@ -267,17 +393,59 @@ export function MeasurementsStepImpl({
     }
   }, [poseStability, resetValidation])
 
-  // Auto-progress when stability reaches 100%
-  useEffect(() => {
-    if (validation && validation.isValid && validation.progress >= 1.0 && !isProcessing) {
-      const timer = setTimeout(() => {
-        onAutoProgress()
-      }, 1500)
-      
-      return () => clearTimeout(timer)
+  
+  const stopCamera = useCallback(() => {
+    Logger.info('Stopping camera')
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream
+      stream.getTracks().forEach(track => track.stop())
+      videoRef.current.srcObject = null
+      Logger.debug('Camera stream stopped and cleared')
     }
-    return undefined
-  }, [validation, isProcessing, onAutoProgress])
+    stopDetection()
+  }, [stopDetection])
+
+  // Auto-progress immediately when validation reaches 100%
+  useEffect(() => {
+    setDebugEffectCount(prev => prev + 1);
+    
+    if (validation && validation.isValid && validation.progress >= 1.0 && !measurements && !debugAutoTrigger) {
+      setDebugAutoTrigger(true);
+      
+      try {
+        // Use averaged measurements from the buffer
+        const realMeasurements = averageMeasurements(measurementBuffer);
+        
+        setMeasurements(realMeasurements);
+        if (!isDemoMode) {
+          stopCamera();
+        }
+        
+        // IMPORTANT: Store measurements in flow state BEFORE progressing
+        onMeasurementsComplete(realMeasurements);
+        
+        // Don't call onAutoProgress() - onMeasurementsComplete already progresses
+        // onAutoProgress();  // Remove this line
+      } catch (error) {
+        setDebugError((error as Error).message);
+        // Fallback to mock measurements
+        const fallbackMeasurements = {
+          chest: 42, waist: 32, hips: 38, shoulders: 18,
+          armLength: 25, inseam: 32, height: 70, weight: 165
+        };
+        setMeasurements(fallbackMeasurements);
+        onMeasurementsComplete(fallbackMeasurements);
+        // onAutoProgress(); // Remove this line too
+      }
+    }
+    
+    // Reset debug states when validation drops below 100%
+    if (!validation || !validation.isValid || validation.progress < 1.0) {
+      setDebugAutoTrigger(false);
+      setDebugError('');
+    }
+  }, [validation?.isValid, validation?.progress, measurements, debugAutoTrigger, measurementBuffer, isDemoMode, onMeasurementsComplete, stopCamera]);
+  
 
   // Log component initialization
   useEffect(() => {
@@ -343,6 +511,46 @@ export function MeasurementsStepImpl({
       offsetY
     })
   }, [])
+
+  const averageMeasurements = (measurements: Measurements[]): Measurements => {
+    if (measurements.length === 0) {
+      // Fallback to mock measurements
+      return {
+        chest: 42, waist: 32, hips: 38, shoulders: 18,
+        armLength: 25, inseam: 32, height: 70, weight: 165
+      };
+    }
+    
+    const averaged: Measurements = {
+      chest: 0, waist: 0, hips: 0, shoulders: 0,
+      armLength: 0, inseam: 0, height: 0, weight: 0
+    };
+    
+    // Sum all measurements
+    measurements.forEach(measurement => {
+      averaged.chest += measurement.chest;
+      averaged.waist += measurement.waist;
+      averaged.hips += measurement.hips;
+      averaged.shoulders += measurement.shoulders;
+      averaged.armLength += measurement.armLength;
+      averaged.inseam += measurement.inseam;
+      averaged.height += measurement.height;
+      averaged.weight += measurement.weight;
+    });
+    
+    // Calculate averages
+    const count = measurements.length;
+    averaged.chest = Math.round((averaged.chest / count) * 10) / 10; // Round to 1 decimal
+    averaged.waist = Math.round((averaged.waist / count) * 10) / 10;
+    averaged.hips = Math.round((averaged.hips / count) * 10) / 10;
+    averaged.shoulders = Math.round((averaged.shoulders / count) * 10) / 10;
+    averaged.armLength = Math.round((averaged.armLength / count) * 10) / 10;
+    averaged.inseam = Math.round((averaged.inseam / count) * 10) / 10;
+    averaged.height = Math.round((averaged.height / count) * 10) / 10;
+    averaged.weight = Math.round((averaged.weight / count) * 10) / 10;
+    
+    return averaged;
+  };
 
   // Draw pose landmarks on canvas
   useEffect(() => {
@@ -1008,16 +1216,6 @@ export function MeasurementsStepImpl({
     }
   }, [syncCanvasToVideo, initializePose, startDetection, enableDemoMode])
 
-  const stopCamera = useCallback(() => {
-    Logger.info('Stopping camera')
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream
-      stream.getTracks().forEach(track => track.stop())
-      videoRef.current.srcObject = null
-      Logger.debug('Camera stream stopped and cleared')
-    }
-    stopDetection()
-  }, [stopDetection])
 
   const handleTakeMeasurement = () => {
     Logger.info('Taking measurement', {
@@ -1152,14 +1350,22 @@ export function MeasurementsStepImpl({
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="px-4 py-3">
-          <div className="flex items-center space-x-2 mb-1">
-            <span className="text-sm text-gray-500">{selectedCompanyName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm text-gray-500">{selectedStyleName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm text-gray-500">{selectedSubStyleName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm font-medium text-blue-600">Step 5 of 6</span>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500">{selectedCompanyName}</span>
+              <span className="text-gray-400">•</span>
+              <span className="text-sm text-gray-500">{selectedStyleName}</span>
+              <span className="text-gray-400">•</span>
+              <span className="text-sm text-gray-500">{selectedSubStyleName}</span>
+              <span className="text-gray-400">•</span>
+              <span className="text-sm font-medium text-blue-600">Step 5 of 6</span>
+            </div>
+            <button
+              onClick={onCancel}
+              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1 rounded-md hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
           </div>
           <h1 className="text-xl font-bold text-gray-900">Get Your Measurements</h1>
           <p className="text-sm text-gray-500">
@@ -1176,6 +1382,7 @@ export function MeasurementsStepImpl({
           isVisible={Boolean(!isDemoMode && !measurements && !isProcessing && selectedStyleId && poseResults?.isDetected)}
           poseStability={poseStability}
         />
+
 
         {isDemoMode ? (
           // Demo mode UI
@@ -1257,27 +1464,6 @@ export function MeasurementsStepImpl({
           </div>
         )}
 
-        {/* Bottom controls */}
-        {!measurements && !isProcessing && (
-          <div className="absolute bottom-4 left-0 right-0 z-20 px-4">
-            <div className="flex gap-3">
-              <button
-                onClick={isDemoMode ? enableDemoMode : stopCamera}
-                className="flex-1 bg-white/80 text-gray-900 backdrop-blur px-4 py-3 rounded-lg font-medium hover:bg-white"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleTakeMeasurement}
-                disabled={!isDemoMode && (!poseResults?.isDetected || !canTakeMeasurement)}
-                className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isDemoMode ? 'Take Measurement' : 
-                  poseStability?.isStable ? 'Take Measurement' : 'Hold Still for Measurements...'}
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Processing overlay */}
         {isProcessing && (

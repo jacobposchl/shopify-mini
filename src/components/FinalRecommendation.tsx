@@ -1,5 +1,12 @@
 import { Recommendation } from '../types'
 
+// TODO: Replace mock data with real Shopify product data
+// To fix the image issue and get proper Nike product photos:
+// 1. Install @shopify/shop-minis-react if not already installed
+// 2. Use useProducts() hook to fetch real product data
+// 3. Replace the mock recommendation with real Shopify product data
+// 4. Real product images will come from Shopify's CDN with proper product photos
+
 interface FinalRecommendationProps {
   recommendation: Recommendation
   onStartOver: () => void
@@ -31,22 +38,7 @@ export function FinalRecommendation({
       {/* Main Content */}
       <main className="px-4 py-6">
         <div className="space-y-6">
-          {/* Success Message */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-medium text-green-900">Perfect Match Found!</h3>
-                <p className="text-sm text-green-700">
-                  {Math.round(confidence * 100)}% confidence in this recommendation
-                </p>
-              </div>
-            </div>
-          </div>
+
 
           {/* Product Card */}
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -110,22 +102,42 @@ export function FinalRecommendation({
               Your Measurements Used
             </h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <p className="text-lg font-bold text-gray-900">{measurements.chest}"</p>
-                <p className="text-sm text-gray-500">Chest</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold text-gray-900">{measurements.waist}"</p>
-                <p className="text-sm text-gray-500">Waist</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold text-gray-900">{measurements.hips}"</p>
-                <p className="text-sm text-gray-500">Hips</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold text-gray-900">{measurements.shoulders}"</p>
-                <p className="text-sm text-gray-500">Shoulders</p>
-              </div>
+              {measurements.chest > 0 && (
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-900">{measurements.chest}"</p>
+                  <p className="text-sm text-gray-500">Chest</p>
+                </div>
+              )}
+              {measurements.waist > 0 && (
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-900">{measurements.waist}"</p>
+                  <p className="text-sm text-gray-500">Waist</p>
+                </div>
+              )}
+              {measurements.hips > 0 && (
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-900">{measurements.hips}"</p>
+                  <p className="text-sm text-gray-500">Hips</p>
+                </div>
+              )}
+              {measurements.shoulders > 0 && (
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-900">{measurements.shoulders}"</p>
+                  <p className="text-sm text-gray-500">Shoulders</p>
+                </div>
+              )}
+              {measurements.armLength > 0 && (
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-900">{measurements.armLength}"</p>
+                  <p className="text-sm text-gray-500">Arm Length</p>
+                </div>
+              )}
+              {measurements.inseam > 0 && (
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-900">{measurements.inseam}"</p>
+                  <p className="text-sm text-gray-500">Inseam</p>
+                </div>
+              )}
             </div>
           </div>
 
