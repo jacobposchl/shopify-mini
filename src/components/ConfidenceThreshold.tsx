@@ -1,21 +1,21 @@
-import { MeasurementValidation } from '../types'
+import React from 'react'
+import { MeasurementValidation, PoseConfidenceRequirement } from '../types'
 
 interface ConfidenceThresholdProps {
   validation: MeasurementValidation
+  requirements: PoseConfidenceRequirement[]
   isVisible: boolean
-  stabilityProgress?: number // Add stability progress from pose stability hook
 }
 
 export function ConfidenceThreshold({ 
   validation, 
-  isVisible,
-  stabilityProgress
+  requirements, 
+  isVisible 
 }: ConfidenceThresholdProps) {
   if (!isVisible) return null
 
-  // Use stability progress if available, otherwise fall back to validation progress
-  const overallProgress = stabilityProgress !== undefined ? stabilityProgress : validation.progress
-  const isComplete = stabilityProgress !== undefined ? stabilityProgress >= 1.0 : validation.isValid
+  const overallProgress = validation.progress
+  const isComplete = validation.isValid
 
   return (
     <div className="absolute top-4 left-4 right-4 z-20">
