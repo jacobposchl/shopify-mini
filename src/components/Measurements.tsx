@@ -296,7 +296,11 @@ export function MeasurementsStepImpl({
   const [cameraError, setCameraError] = useState<string>('')
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [debugEffectCount, setDebugEffectCount] = useState(0);
+  const [debugAutoTrigger, setDebugAutoTrigger] = useState(false)
+  const [debugError, setDebugError] = useState<string>('')
 
+  const [measurementBuffer, setMeasurementBuffer] = useState<Measurements[]>([])
+const [debugBufferSize, setDebugBufferSize] = useState(0)
 
   const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
 
@@ -338,7 +342,45 @@ export function MeasurementsStepImpl({
     }
   }, [selectedStyleId, setSelectedStyle])
 
+  // Track measurements during validation progression
+  useEffect(() => {
+    // Only track measurements when pose is detected, validation is progressing, and we're stable
+    if (poseResults?.isDetected && 
+        validation && 
+        validation.progress > 0 && 
+        validation.progress < 1.0 && 
+        poseStability?.isStable &&
+        selectedStyleId) {
+      
+      try {
+        const currentMeasurement = calculateRealMeasurements(
+          poseResults.landmarks, 
+          parseFloat(canvasRef.current?.dataset.videoScale || '1'), 
+          selectedStyleId
+        );
+        
+        // Add to buffer (limit buffer size to prevent memory issues)
+        setMeasurementBuffer(prev => {
+          const newBuffer = [...prev, currentMeasurement];
+          // Keep only last 100 measurements (about 10 seconds at 10fps)
+          const limitedBuffer = newBuffer.slice(-100);
+          setDebugBufferSize(limitedBuffer.length);
+          return limitedBuffer;
+        });
+        
+      } catch (error) {
+        setDebugError(`Measurement tracking error: ${(error as Error).message}`);
+      }
+    }
+  }, [poseResults, validation?.progress, poseStability?.isStable, selectedStyleId]);
 
+  // Reset measurement buffer when validation resets
+  useEffect(() => {
+    if (!validation || validation.progress === 0 || !poseStability?.isStable) {
+      setMeasurementBuffer([]);
+      setDebugBufferSize(0);
+    }
+  }, [validation?.progress, poseStability?.isStable]);
 
   // Reset validation when pose becomes unstable
   useEffect(() => {
@@ -349,37 +391,58 @@ export function MeasurementsStepImpl({
     }
   }, [poseStability, resetValidation])
 
-  // Auto-take measurements when validation reaches 100%
+  
+  const stopCamera = useCallback(() => {
+    Logger.info('Stopping camera')
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream
+      stream.getTracks().forEach(track => track.stop())
+      videoRef.current.srcObject = null
+      Logger.debug('Camera stream stopped and cleared')
+    }
+    stopDetection()
+  }, [stopDetection])
+
+  // Auto-progress immediately when validation reaches 100%
   useEffect(() => {
-    // Increment counter to show effect is running
     setDebugEffectCount(prev => prev + 1);
     
-    if (validation && validation.isValid && validation.progress >= 1.0 && !isProcessing && !measurements) {
-      const timer = setTimeout(() => {
-        setIsProcessing(true);
-        
-        setTimeout(() => {
-          const realMeasurements = poseResults?.landmarks && selectedStyleId 
-            ? calculateRealMeasurements(poseResults.landmarks, parseFloat(canvasRef.current?.dataset.videoScale || '1'), selectedStyleId)
-            : {
-                chest: 42, waist: 32, hips: 38, shoulders: 18,
-                armLength: 25, inseam: 32, height: 70, weight: 165
-              };
-              
-          setMeasurements(realMeasurements);
-          setIsProcessing(false);
-          if (!isDemoMode) {
-            stopCamera();
-          }
-          onAutoProgress();
-        }, 2000);
-      }, 1500);
+    if (validation && validation.isValid && validation.progress >= 1.0 && !measurements && !debugAutoTrigger) {
+      setDebugAutoTrigger(true);
       
-      return () => clearTimeout(timer);
+      try {
+        // Use averaged measurements from the buffer
+        const realMeasurements = averageMeasurements(measurementBuffer);
+        
+        setMeasurements(realMeasurements);
+        if (!isDemoMode) {
+          stopCamera();
+        }
+        
+        // IMPORTANT: Store measurements in flow state BEFORE progressing
+        onMeasurementsComplete(realMeasurements);
+        
+        // Don't call onAutoProgress() - onMeasurementsComplete already progresses
+        // onAutoProgress();  // Remove this line
+      } catch (error) {
+        setDebugError((error as Error).message);
+        // Fallback to mock measurements
+        const fallbackMeasurements = {
+          chest: 42, waist: 32, hips: 38, shoulders: 18,
+          armLength: 25, inseam: 32, height: 70, weight: 165
+        };
+        setMeasurements(fallbackMeasurements);
+        onMeasurementsComplete(fallbackMeasurements);
+        // onAutoProgress(); // Remove this line too
+      }
     }
-    return undefined;
-  }, [validation, isProcessing, measurements, isDemoMode, poseResults, selectedStyleId, onAutoProgress, stopCamera]);
-
+    
+    // Reset debug states when validation drops below 100%
+    if (!validation || !validation.isValid || validation.progress < 1.0) {
+      setDebugAutoTrigger(false);
+      setDebugError('');
+    }
+  }, [validation?.isValid, validation?.progress, measurements, debugAutoTrigger, measurementBuffer, isDemoMode, onMeasurementsComplete, stopCamera]);
   
 
   // Log component initialization
@@ -446,6 +509,46 @@ export function MeasurementsStepImpl({
       offsetY
     })
   }, [])
+
+  const averageMeasurements = (measurements: Measurements[]): Measurements => {
+    if (measurements.length === 0) {
+      // Fallback to mock measurements
+      return {
+        chest: 42, waist: 32, hips: 38, shoulders: 18,
+        armLength: 25, inseam: 32, height: 70, weight: 165
+      };
+    }
+    
+    const averaged: Measurements = {
+      chest: 0, waist: 0, hips: 0, shoulders: 0,
+      armLength: 0, inseam: 0, height: 0, weight: 0
+    };
+    
+    // Sum all measurements
+    measurements.forEach(measurement => {
+      averaged.chest += measurement.chest;
+      averaged.waist += measurement.waist;
+      averaged.hips += measurement.hips;
+      averaged.shoulders += measurement.shoulders;
+      averaged.armLength += measurement.armLength;
+      averaged.inseam += measurement.inseam;
+      averaged.height += measurement.height;
+      averaged.weight += measurement.weight;
+    });
+    
+    // Calculate averages
+    const count = measurements.length;
+    averaged.chest = Math.round((averaged.chest / count) * 10) / 10; // Round to 1 decimal
+    averaged.waist = Math.round((averaged.waist / count) * 10) / 10;
+    averaged.hips = Math.round((averaged.hips / count) * 10) / 10;
+    averaged.shoulders = Math.round((averaged.shoulders / count) * 10) / 10;
+    averaged.armLength = Math.round((averaged.armLength / count) * 10) / 10;
+    averaged.inseam = Math.round((averaged.inseam / count) * 10) / 10;
+    averaged.height = Math.round((averaged.height / count) * 10) / 10;
+    averaged.weight = Math.round((averaged.weight / count) * 10) / 10;
+    
+    return averaged;
+  };
 
   // Draw pose landmarks on canvas
   useEffect(() => {
@@ -1111,16 +1214,6 @@ export function MeasurementsStepImpl({
     }
   }, [syncCanvasToVideo, initializePose, startDetection, enableDemoMode])
 
-  const stopCamera = useCallback(() => {
-    Logger.info('Stopping camera')
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream
-      stream.getTracks().forEach(track => track.stop())
-      videoRef.current.srcObject = null
-      Logger.debug('Camera stream stopped and cleared')
-    }
-    stopDetection()
-  }, [stopDetection])
 
   const handleTakeMeasurement = () => {
     Logger.info('Taking measurement', {
@@ -1287,11 +1380,14 @@ export function MeasurementsStepImpl({
               <div>Valid: {validation?.isValid ? '✅' : '❌'}</div>
               <div>Prog: {Math.round((validation?.progress || 0) * 100)}%</div>
               <div>≥100: {(validation?.progress || 0) >= 1.0 ? '✅' : '❌'}</div>
-              <div>Proc: {isProcessing ? '❌' : '✅'}</div>
-              <div>Meas: {measurements ? '❌' : '✅'}</div>
+              <div>Stable: {poseStability?.isStable ? '✅' : '❌'}</div>
+              <div>Buffer: {debugBufferSize} samples</div>
               <div className="border-t border-gray-600 pt-1 mt-1">
                 <div>Effect runs: {debugEffectCount}</div>
                 <div>Should trigger: {validation?.progress >= 1.0 ? '🔥 YES' : '❌ NO'}</div>
+                <div>Auto triggered: {debugAutoTrigger ? '✅' : '❌'}</div>
+                <div>Using averaged: {debugBufferSize > 0 ? '✅' : '❌'}</div>
+                {debugError && <div className="text-red-400">Error: {debugError}</div>}
               </div>
             </div>
           </div>
