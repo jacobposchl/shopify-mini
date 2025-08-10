@@ -39,6 +39,17 @@ export interface ClothingItem {
   subStyleId: string
 }
 
+// Pose detection results
+export interface PoseResults {
+  landmarks: Array<{
+    x: number
+    y: number
+    confidence: number
+  }>
+  isDetected: boolean
+  confidence: number
+}
+
 // Pose confidence requirements for different clothing types
 export interface PoseConfidenceRequirement {
   keypointIndices: number[] // PoseNet keypoint indices (0-16)

@@ -9,12 +9,14 @@ import { getPoseRequirements } from '../data/poseRequirements'
 interface UsePoseValidationProps {
   poseResults: PoseResults | null
   selectedStyleId?: string
+  isPoseStable?: boolean // New prop for pose stability
   onValidationComplete?: (validation: MeasurementValidation) => void
 }
 
 export function usePoseValidation({
   poseResults,
   selectedStyleId,
+  isPoseStable = false, // Default to false if not provided
   onValidationComplete
 }: UsePoseValidationProps) {
   const [validation, setValidation] = useState<MeasurementValidation>({
@@ -91,7 +93,7 @@ export function usePoseValidation({
     updateValidation(now)
   }, [poseResults])
 
-  // Update validation status based on current confidence history
+  // Update validation status based on current confidence history and stability
   const updateValidation = useCallback((timestamp: number) => {
     if (requirementsRef.current.length === 0) return
 
@@ -121,7 +123,11 @@ export function usePoseValidation({
         : 0
 
       const progress = Math.min(duration / requirement.requiredDuration, 1)
-      const isMet = currentConfidence >= requirement.minConfidence && duration >= requirement.requiredDuration
+      
+      // A requirement is met only if confidence is high enough AND pose is stable
+      const isMet = currentConfidence >= requirement.minConfidence && 
+                   duration >= requirement.requiredDuration && 
+                   isPoseStable
 
       newRequirements[key] = {
         met: isMet,
@@ -141,9 +147,11 @@ export function usePoseValidation({
 
     let message = ''
     if (isValid) {
-      message = 'All pose requirements met! Ready to take measurements.'
+      message = 'All pose requirements met and pose is stable! Ready to take measurements.'
+    } else if (!isPoseStable) {
+      message = 'Pose requirements met, but pose is not stable yet. Please hold still.'
     } else if (overallProgress > 0.5) {
-      message = 'Good progress! Keep holding the pose.'
+      message = 'Good progress! Keep holding the pose and stay still.'
     } else if (overallProgress > 0) {
       message = 'Pose detected. Hold still to meet requirements.'
     } else {
@@ -165,7 +173,7 @@ export function usePoseValidation({
       lastUpdateRef.current = timestamp
       onValidationComplete(newValidation)
     }
-  }, [onValidationComplete])
+  }, [onValidationComplete, isPoseStable])
 
   // Reset validation
   const resetValidation = useCallback(() => {

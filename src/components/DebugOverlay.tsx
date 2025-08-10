@@ -1,5 +1,5 @@
 // src/components/DebugOverlay.tsx
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Logger } from '../utils/Logger'
 
 interface DebugOverlayProps {
@@ -17,6 +17,13 @@ interface DebugOverlayProps {
     stream: MediaStream | null
   }
   videoElement: HTMLVideoElement | null
+  poseStability?: {
+    isStable: boolean
+    stableLandmarksCount: number
+    totalLandmarksCount: number
+    stabilityProgress: number
+    message: string
+  }
 }
 
 export function DebugOverlay({
@@ -24,7 +31,8 @@ export function DebugOverlay({
   onClose,
   poseDetectionStatus,
   cameraStatus,
-  videoElement
+  videoElement,
+  poseStability
 }: DebugOverlayProps) {
   const [tfBackend, setTfBackend] = useState<string>('Unknown')
   const [webglInfo, setWebglInfo] = useState<any>(null)
@@ -121,6 +129,78 @@ export function DebugOverlay({
             </div>
           </div>
 
+          {/* Pose Detection Results */}
+          {poseDetectionStatus.poseResults && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Pose Detection Results</h3>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span>Pose Detected:</span>
+                  <span className={poseDetectionStatus.poseResults.isDetected ? 'text-green-600' : 'text-red-600'}>
+                    {poseDetectionStatus.poseResults.isDetected ? '✅ Yes' : '❌ No'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Confidence:</span>
+                  <span className="font-mono">
+                    {Math.round((poseDetectionStatus.poseResults.confidence || 0) * 100)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Landmarks:</span>
+                  <span className="font-mono">
+                    {poseDetectionStatus.poseResults.landmarks?.length || 0}
+                  </span>
+                </div>
+                {poseDetectionStatus.poseResults.landmarks && poseDetectionStatus.poseResults.landmarks.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="text-sm font-medium text-gray-700 mb-2">Landmark Details:</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {poseDetectionStatus.poseResults.landmarks.slice(0, 8).map((landmark: any, index: number) => (
+                        <div key={index} className="flex justify-between bg-white px-2 py-1 rounded">
+                          <span>KP {index}:</span>
+                          <span className="font-mono">
+                            {Math.round(landmark.confidence * 100)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Pose Stability Information */}
+          {poseStability && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Pose Stability</h3>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span>Overall Stable:</span>
+                  <span className={poseStability.isStable ? 'text-green-600' : 'text-yellow-600'}>
+                    {poseStability.isStable ? '✅ Stable' : '⏳ Stabilizing'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Stable Landmarks:</span>
+                  <span className="font-mono">
+                    {poseStability.stableLandmarksCount} / {poseStability.totalLandmarksCount}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Stability Progress:</span>
+                  <span className="font-mono">
+                    {Math.round(poseStability.stabilityProgress * 100)}%
+                  </span>
+                </div>
+                <div className="mt-2 p-2 bg-blue-50 rounded text-sm text-blue-800">
+                  {poseStability.message}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* WebGL Information */}
           {webglInfo && (
             <div>
@@ -207,33 +287,6 @@ export function DebugOverlay({
             </div>
           </div>
 
-          {/* Pose Detection Results */}
-          {poseDetectionStatus.poseResults && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Pose Detection Results</h3>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between">
-                  <span>Pose Detected:</span>
-                  <span className={poseDetectionStatus.poseResults.isDetected ? 'text-green-600' : 'text-red-600'}>
-                    {poseDetectionStatus.poseResults.isDetected ? '✅ Yes' : '❌ No'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Confidence:</span>
-                  <span className="font-mono">
-                    {Math.round((poseDetectionStatus.poseResults.confidence || 0) * 100)}%
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Landmarks:</span>
-                  <span className="font-mono">
-                    {poseDetectionStatus.poseResults.landmarks?.length || 0}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* System Information */}
           {systemInfo && (
             <div>
@@ -308,6 +361,7 @@ export function DebugOverlay({
                   tfBackend,
                   webglInfo,
                   poseDetectionStatus,
+                  poseStability,
                   cameraStatus,
                   systemInfo,
                   timestamp: new Date().toISOString()
