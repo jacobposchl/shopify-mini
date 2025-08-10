@@ -190,6 +190,23 @@ export function MeasurementsStepImpl({
   selectedSubStyleName,
   selectedStyleId
 }: MeasurementsStepProps) {
+
+  // Add the calculateDistance function HERE - right after the component starts
+  const calculateDistance = (landmark1: any, landmark2: any, scale: number) => {
+    // Calculate pixel distance
+    const pixelDistance = Math.sqrt(
+      Math.pow((landmark2.x - landmark1.x) * scale, 2) + 
+      Math.pow((landmark2.y - landmark1.y) * scale, 2)
+    );
+    
+    // Convert pixels to inches (you'll need to calibrate this ratio)
+    const calibrationFactor = 22.5 / 2.0; // = 11.25
+    const distanceInInches = (pixelDistance / 50) * calibrationFactor;
+    
+    return distanceInInches.toFixed(1);
+  };
+
+  // Your existing code continues here (videoRef, canvasRef, etc.)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const hasBootedRef = useRef(false)
@@ -252,23 +269,15 @@ export function MeasurementsStepImpl({
 
   // Auto-progress when stability reaches 100%
   useEffect(() => {
-    if (poseStability && poseStability.stabilityScore >= 1.0 && !isProcessing) {
-      Logger.info('Stability reached 100%, auto-progressing to next step in 1.5 seconds', {
-        stabilityScore: poseStability.stabilityScore,
-        measurements: !!measurements,
-        isProcessing,
-        poseStability
-      })
-      // Add a small delay to show the success message
+    if (validation && validation.isValid && validation.progress >= 1.0 && !isProcessing) {
       const timer = setTimeout(() => {
-        Logger.info('Executing auto-progression to next step')
         onAutoProgress()
       }, 1500)
       
       return () => clearTimeout(timer)
     }
     return undefined
-  }, [poseStability, isProcessing, onAutoProgress])
+  }, [validation, isProcessing, onAutoProgress])
 
   // Log component initialization
   useEffect(() => {
@@ -351,6 +360,104 @@ export function MeasurementsStepImpl({
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
+    const drawHumanGuide = () => {
+    ctx.save()
+    
+    const centerX = canvas.width / 2
+    const totalHeight = canvas.height * 0.75
+    const headHeight = totalHeight / 8
+    const startY = canvas.height * 0.15
+    
+    // More visible outline
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'
+    ctx.lineWidth = 3
+    ctx.setLineDash([8, 4])
+    
+    // Head (positioned at top, not overlapping)
+    const headWidth = headHeight * 0.7
+    const headCenterY = startY + headHeight/2
+    ctx.beginPath()
+    ctx.ellipse(centerX, headCenterY, headWidth/2, headHeight/2, 0, 0, 2 * Math.PI)
+    ctx.stroke()
+    
+    // Neck (starts after head ends)
+    const neckStartY = startY + headHeight
+    const neckEndY = neckStartY + headHeight * 0.4
+    ctx.beginPath()
+    ctx.moveTo(centerX, neckStartY)
+    ctx.lineTo(centerX, neckEndY)
+    ctx.stroke()
+    
+    // Shoulders (start after neck ends)
+    const shoulderY = neckEndY + headHeight * 1
+    const shoulderWidth = headHeight * 2.2
+    ctx.beginPath()
+    ctx.arc(centerX, shoulderY, shoulderWidth/2, Math.PI, 0, false)
+    ctx.stroke()
+    
+    // Rest of body starts from shoulder line
+    const waistY = shoulderY + headHeight * 2
+    const hipY = shoulderY + headHeight * 2.8
+    const waistWidth = shoulderWidth * 0.7
+    const hipWidth = shoulderWidth * 0.9
+    
+    // Left side of torso
+    ctx.beginPath()
+    ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
+    ctx.quadraticCurveTo(centerX - waistWidth/2, waistY, centerX - hipWidth/2, hipY)
+    ctx.stroke()
+    
+    // Right side of torso
+    ctx.beginPath()
+    ctx.moveTo(centerX + shoulderWidth/2, shoulderY)
+    ctx.quadraticCurveTo(centerX + waistWidth/2, waistY, centerX + hipWidth/2, hipY)
+    ctx.stroke()
+    
+    // Arms
+    const elbowY = shoulderY + headHeight * 1.5
+    const wristY = shoulderY + headHeight * 2.5
+    const armWidth = headHeight * 0.3
+    
+    // Left arm
+    ctx.beginPath()
+    ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
+    ctx.lineTo(centerX - shoulderWidth/2 - armWidth, elbowY)
+    ctx.lineTo(centerX - shoulderWidth/2 - armWidth * 0.5, wristY)
+    ctx.stroke()
+    
+    // Right arm
+    ctx.beginPath()
+    ctx.moveTo(centerX + shoulderWidth/2, shoulderY)
+    ctx.lineTo(centerX + shoulderWidth/2 + armWidth, elbowY)
+    ctx.lineTo(centerX + shoulderWidth/2 + armWidth * 0.5, wristY)
+    ctx.stroke()
+    
+    // Legs
+    const legWidth = headHeight * 0.4
+    const kneeY = hipY + headHeight * 2
+    const maxAnkleY = startY + totalHeight
+    const ankleY = Math.min(hipY + headHeight * 4, maxAnkleY)
+    
+    // Left leg
+    ctx.beginPath()
+    ctx.moveTo(centerX - hipWidth/4, hipY)
+    ctx.lineTo(centerX - legWidth/2, kneeY)
+    ctx.lineTo(centerX - legWidth/3, ankleY)
+    ctx.stroke()
+    
+    // Right leg
+    ctx.beginPath()
+    ctx.moveTo(centerX + hipWidth/4, hipY)
+    ctx.lineTo(centerX + legWidth/2, kneeY)
+    ctx.lineTo(centerX + legWidth/3, ankleY)
+    ctx.stroke()
+    
+    ctx.restore()
+    }
+
+    // Always show the guide
+    drawHumanGuide()
+
     // Set drawing style
     ctx.strokeStyle = '#00ff00'
     ctx.lineWidth = 2
@@ -402,30 +509,59 @@ export function MeasurementsStepImpl({
     ]
 
     skeletonConnections.forEach(([index1, index2]) => {
-      const landmark1 = poseResults.landmarks[index1]
-      const landmark2 = poseResults.landmarks[index2]
+        const landmark1 = poseResults.landmarks[index1]
+        const landmark2 = poseResults.landmarks[index2]
+        
+        if (landmark1 && landmark2 && 
+            landmark1.confidence > 0.3 && landmark2.confidence > 0.3) {
+          
+          const x1 = canvas.width - ((landmark1.x * scale) + offsetX)
+          const y1 = (landmark1.y * scale) + offsetY
+          const x2 = canvas.width - ((landmark2.x * scale) + offsetX)
+          const y2 = (landmark2.y * scale) + offsetY
       
-      if (landmark1 && landmark2 && 
-          landmark1.confidence > 0.3 && landmark2.confidence > 0.3) {
-        
-        const x1 = canvas.width - ((landmark1.x * scale) + offsetX)
-        const y1 = (landmark1.y * scale) + offsetY
-        const x2 = canvas.width - ((landmark2.x * scale) + offsetX)
-        const y2 = (landmark2.y * scale) + offsetY
-
-        // Check if this connection is relevant for the current clothing type
-        const isRelevant = poseStability?.relevantLandmarks.includes(index1) && 
-                          poseStability?.relevantLandmarks.includes(index2)
-        
-        // Draw skeleton line with different styles for relevant vs non-relevant
-        ctx.strokeStyle = isRelevant ? '#00ff00' : '#666666'
-        ctx.lineWidth = isRelevant ? 3 : 1
-        ctx.beginPath()
-        ctx.moveTo(x1, y1)
-        ctx.lineTo(x2, y2)
-        ctx.stroke()
-      }
-    })
+          // Check if this connection is relevant for the current clothing type
+          const isRelevant = poseStability?.relevantLandmarks.includes(index1) && 
+                            poseStability?.relevantLandmarks.includes(index2)
+          
+          // Draw skeleton line
+          ctx.strokeStyle = isRelevant ? '#00ff00' : '#666666'
+          ctx.lineWidth = isRelevant ? 3 : 1
+          ctx.beginPath()
+          ctx.moveTo(x1, y1)
+          ctx.lineTo(x2, y2)
+          ctx.stroke()
+      
+            if (isRelevant) {
+                const distance = calculateDistance(landmark1, landmark2, scale)
+                
+                // Calculate midpoint for text placement
+                const midX = (x1 + x2) / 2
+                const midY = (y1 + y2) / 2
+                
+                // Calculate perpendicular offset to avoid overlapping with line
+                const lineLength = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+                const offsetDistance = 25 // pixels away from line
+                const offsetX = -(y2 - y1) / lineLength * offsetDistance
+                const offsetY = (x2 - x1) / lineLength * offsetDistance
+                
+                const textX = midX + offsetX
+                const textY = midY + offsetY
+                
+                // Draw text background
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+                ctx.font = 'bold 12px Arial'
+                const text = `${distance}"`
+                const textWidth = ctx.measureText(text).width
+                ctx.fillRect(textX - textWidth/2 - 3, textY - 8, textWidth + 6, 16)
+                
+                // Draw text
+                ctx.fillStyle = '#00ff00'
+                ctx.textAlign = 'center'
+                ctx.fillText(text, textX, textY + 3)
+            }
+        }
+      })
 
     // Draw measurement overlay if measurements are available
     if (measurements && selectedStyleId) {
@@ -1118,53 +1254,6 @@ export function MeasurementsStepImpl({
                 {getClothingInstructions(selectedStyleId)}
               </p>
             </div>
-          </div>
-        )}
-
-        {/* Pose Stability Status */}
-        {!isDemoMode && !measurements && !isProcessing && poseStability && (
-          <div className="absolute bottom-32 left-4 z-20">
-
-
-
-
-
-
-            <div className={`px-3 py-2 rounded-lg text-sm font-medium ${
-              poseStability.isStable 
-                ? 'bg-green-600/80 text-white' 
-                : 'bg-red-600/80 text-white'
-            }`}>
-              {poseStability.isStable ? '✅ Pose Stable' : '⚠️ Pose Unstable'}
-            </div>
-            
-            {/* Stability Progress Bar */}
-            <div className="mt-2 px-3 py-2 rounded-lg text-sm font-medium bg-black/60 text-white">
-              <div className="flex items-center space-x-2 mb-1">
-                <span>Stability:</span>
-                <span className="font-bold">{Math.round(poseStability.stabilityScore * 100)}%</span>
-              </div>
-              <div className="w-full bg-white/20 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    poseStability.stabilityScore >= 1.0 ? 'bg-green-400' : 'bg-blue-400'
-                  }`}
-                  style={{ width: `${poseStability.stabilityScore * 100}%` }}
-                />
-              </div>
-            </div>
-            
-            {/* Auto-progression indicator */}
-            {poseStability.stabilityScore >= 0.9 && poseStability.stabilityScore < 1.0 && (
-              <div className="mt-2 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600/80 text-white">
-                🚀 Almost ready! Hold still a bit longer...
-              </div>
-            )}
-            {poseStability.stabilityScore >= 1.0 && (
-              <div className="mt-2 px-3 py-2 rounded-lg text-sm font-medium bg-green-600/80 text-white">
-                🎉 Perfect! Moving to next step...
-              </div>
-            )}
           </div>
         )}
 
