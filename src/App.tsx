@@ -7,7 +7,6 @@ import { ClothingSelection } from './components/ClothingSelection'
 import { MeasurementsStep } from './components/Measurements'
 import { FinalRecommendation } from './components/FinalRecommendation'
 import { clothingItems } from './data/mockData'
-import { DebugOverlay } from './components/DebugOverlay';
 
 export function App() {
   const {
@@ -136,6 +135,7 @@ export function App() {
             selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
             selectedStyleName={flowState.userPreferences.selectedStyle?.name}
             selectedSubStyleName={flowState.userPreferences.selectedSubStyle?.name}
+            selectedStyleId={flowState.userPreferences.selectedStyle?.id}
           />
         )
 
@@ -175,7 +175,6 @@ export function App() {
   return (
     <>
       {renderCurrentStep()}
-      <DebugOverlay />
     </>
   )
 }
