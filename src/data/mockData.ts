@@ -52,6 +52,7 @@ export const styles = [
 // Substyles only for the 4 visible style categories (no dresses/activewear to avoid unreachable options)
 export const subStyles: SubStyle[] = [
   // Shirts
+<<<<<<< HEAD
   { id: 'crew-neck',   name: 'Crew Neck',   styleId: 'shirts',
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/3126/3126092.png' },
   { id: 'v-neck',      name: 'V-Neck',      styleId: 'shirts',
@@ -85,6 +86,28 @@ export const subStyles: SubStyle[] = [
   { id: 'windbreaker', name: 'Windbreaker', styleId: 'jackets',
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/614/614281.png' },
 
+=======
+  { id: 'crew-neck',   name: 'Crew Neck',   styleId: 'shirts', description: 'Classic round neck t-shirt' },
+  { id: 'v-neck',      name: 'V-Neck',      styleId: 'shirts', description: 'V-shaped neckline t-shirt' },
+  { id: 'button-down', name: 'Button Down', styleId: 'shirts', description: 'Button-up collared shirt' },
+  { id: 'polo',        name: 'Polo',        styleId: 'shirts', description: 'Collared polo shirt' },
+
+  // Pants
+  { id: 'jeans',       name: 'Jeans',       styleId: 'pants', description: 'Denim jeans' },
+  { id: 'joggers',     name: 'Joggers',     styleId: 'pants', description: 'Athletic jogger pants' },
+  { id: 'dress-pants', name: 'Dress Pants', styleId: 'pants', description: 'Formal dress pants' },
+  { id: 'leggings',    name: 'Leggings',    styleId: 'pants', description: 'Fitted athletic leggings' },
+
+  // Shorts
+  { id: 'athletic-shorts', name: 'Athletic Shorts', styleId: 'shorts', description: 'Sports athletic shorts' },
+  { id: 'casual-shorts',   name: 'Casual Shorts',   styleId: 'shorts', description: 'Casual everyday shorts' },
+  { id: 'dress-shorts',    name: 'Dress Shorts',    styleId: 'shorts', description: 'Formal dress shorts' },
+
+  // Jackets
+  { id: 'hoodie',      name: 'Hoodie',      styleId: 'jackets', description: 'Hooded sweatshirt' },
+  { id: 'blazer',      name: 'Blazer',      styleId: 'jackets', description: 'Formal blazer jacket' },
+  { id: 'windbreaker', name: 'Windbreaker', styleId: 'jackets', description: 'Lightweight windbreaker jacket' },
+>>>>>>> 5d1f5df3e5f09bbbed060fe0c71f1472daa3843c
 ]
 
 
