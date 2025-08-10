@@ -21,8 +21,9 @@ export interface SubStyle {
   id: string
   name: string
   styleId: string
-  description?: string      // ← make optional (prevents TS errors)
-  iconUrl?: string          // ← add this
+  iconUrl?: string
+  iconSelectedUrl?: string
+  description?: string
 }
 
 export interface ClothingItem {

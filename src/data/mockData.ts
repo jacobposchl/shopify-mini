@@ -165,13 +165,13 @@ export const styles = [
 export const subStyles: SubStyle[] = [
   // Shirts
   { id: 'crew-neck',   name: 'Crew Neck',   styleId: 'shirts',
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/3126/3126092.png' },
+    iconUrl: 'https://i.postimg.cc/85vDWDt0/Chat-GPT-Image-Aug-10-2025-01-02-11-PM.png' },
   { id: 'v-neck',      name: 'V-Neck',      styleId: 'shirts',
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2348/2348168.png' },
+    iconUrl: 'https://i.postimg.cc/jdtKWpNM/Chat-GPT-Image-Aug-10-2025-01-03-12-PM.png' },
   { id: 'button-down', name: 'Button Down', styleId: 'shirts',
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/343/343225.png' },
+    iconUrl: 'https://i.postimg.cc/nh45frM2/32839036-cd91-483f-961c-39cf78f778c3.png' },
   { id: 'polo',        name: 'Polo',        styleId: 'shirts',
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1363/1363167.png' },
+    iconUrl: 'https://i.postimg.cc/65cKCMft/Chat-GPT-Image-Aug-10-2025-01-05-05-PM.png' },
 
   // Pants
   { id: 'jeans',       name: 'Jeans',       styleId: 'pants',
