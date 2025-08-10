@@ -17,7 +17,8 @@ export function App() {
     setMeasurements,
     setRecommendations,
     resetFlow,
-    goToNextStep
+    goToNextStep,
+    goToPreviousStep
   } = useFlowState()
 
   const handleBack = () => {
