@@ -19,6 +19,8 @@ export function FinalRecommendation({
   onAddToCart 
 }: FinalRecommendationProps) {
   const { item, recommendedSize, confidence, measurements } = recommendation
+  
+
 
   return (
     <div className="min-h-screen">

@@ -102,7 +102,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
       price: product.price.amount ? `${product.price.currencyCode} ${product.price.amount}` : 'Price not available',
       image: product.featuredImage?.url || '',
       colors: [], // Extract from variants if available
-      sizes: [], // Extract from variants if available
+      sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], // Default sizes for now
       companyId: product.shop.id,
       styleId: style?.id || '',
       subStyleId: subStyle?.id || '',
@@ -218,13 +218,13 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
   }
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-[#550cff]">
       <div className="max-w-md mx-auto p-4">
         <BackButton onClick={handleBack} />
         
         {/* Header with selection summary */}
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Step 4: Choose Your Items</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">Step 4: Choose Your Items</h1>
 
           
           
@@ -234,11 +234,11 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
           {/* Search query and filters display */}
           <div className="space-y-2 mb-4">
             <div className="text-center space-y-1">
-              {style?.name && (
-                <div className="text-xs text-gray-500">
-                  Category: {style.name} • Gender: {style.name.toLowerCase().includes('dress') || style.name.toLowerCase().includes('suit') ? 'Male' : style.name.toLowerCase().includes('dress') || style.name.toLowerCase().includes('skirt') ? 'Female' : 'Neutral'}
-                </div>
-              )}
+                             {style?.name && (
+                 <div className="text-xs text-white/80">
+                   Category: {style.name} • Gender: {style.name.toLowerCase().includes('dress') || style.name.toLowerCase().includes('suit') ? 'Male' : style.name.toLowerCase().includes('dress') || style.name.toLowerCase().includes('skirt') ? 'Female' : 'Neutral'}
+                 </div>
+               )}
                {/* Show when using fallback products */}
                {!shopifyProducts && (
                  <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
@@ -252,7 +252,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
         
         {/* Products count */}
         <div className="mb-4">
-          <p className="text-sm text-gray-600 text-center">
+          <p className="text-sm text-white/80 text-center">
             {products.length} item{products.length !== 1 ? 's' : ''} available
           </p>
         </div>
@@ -287,7 +287,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
                   {/* Product image */}
                   <div className="aspect-square mb-3 rounded-md overflow-hidden bg-gray-100">
                     {item.image ? (
-                      <ProductImage src={item.image} alt={item.name} />
+                      <ProductImage src={item.image} alt={item.name} className="w-full h-full" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400">
                         <span className="text-2xl">👕</span>
@@ -331,9 +331,9 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
           </div>
         ) : (
           <div className="text-center py-8">
-            <div className="text-gray-400 text-6xl mb-4">😕</div>
-            <h3 className="text-lg font-medium text-gray-800 mb-2">No items found</h3>
-                         <p className="text-gray-600 mb-4">
+            <div className="text-white/60 text-6xl mb-4">😕</div>
+            <h3 className="text-lg font-medium text-white mb-2">No items found</h3>
+                         <p className="text-white/80 mb-4">
                We couldn't find any items matching your exact criteria. This might be because the Shopify store doesn't have products matching your selections, or there might be a connection issue.
              </p>
             <button
@@ -353,7 +353,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
                 onClick={handleContinue}
                 className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
               >
-                Continue with {selectedItem.name}
+                                 Continue
               </button>
             </div>
           </div>

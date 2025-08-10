@@ -7,6 +7,8 @@ export function calculateRecommendedSize(
   // Simple size recommendation logic based on chest/waist measurements
   // In a real app, this would be much more sophisticated
   
+
+  
   let recommendedSize = 'M'
   let confidence = 0.8
 
@@ -49,6 +51,21 @@ export function calculateRecommendedSize(
       recommendedSize = 'M'
       confidence = 0.85
     } else if (measurements.waist <= 38) {
+      recommendedSize = 'L'
+      confidence = 0.85
+    } else {
+      recommendedSize = 'XL'
+      confidence = 0.8
+    }
+  } else if (item.styleId === 'jackets') {
+    // Jacket sizing based on chest measurement
+    if (measurements.chest <= 36) {
+      recommendedSize = 'S'
+      confidence = 0.9
+    } else if (measurements.chest <= 40) {
+      recommendedSize = 'M'
+      confidence = 0.85
+    } else if (measurements.chest <= 44) {
       recommendedSize = 'L'
       confidence = 0.85
     } else {
