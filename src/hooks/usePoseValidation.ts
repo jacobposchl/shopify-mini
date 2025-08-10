@@ -5,17 +5,24 @@ import {
   PoseResults 
 } from '../types'
 import { getPoseRequirements } from '../data/poseRequirements'
+import { Logger } from '../utils/Logger'
 
 interface UsePoseValidationProps {
   poseResults: PoseResults | null
   selectedStyleId?: string
   onValidationComplete?: (validation: MeasurementValidation) => void
+  poseStability?: {
+    isStable: boolean
+    stabilityScore: number
+    relevantLandmarks: number[]
+  } | null
 }
 
 export function usePoseValidation({
   poseResults,
   selectedStyleId,
-  onValidationComplete
+  onValidationComplete,
+  poseStability
 }: UsePoseValidationProps) {
   const [validation, setValidation] = useState<MeasurementValidation>({
     isValid: false,
@@ -44,6 +51,22 @@ export function usePoseValidation({
       confidenceHistoryRef.current.clear()
     }
   }, [selectedStyleId])
+
+  // Reset validation when pose becomes unstable
+  useEffect(() => {
+    if (poseStability && !poseStability.isStable) {
+      // Assuming Logger is defined elsewhere or will be added.
+      // For now, we'll just log a message.
+      console.log('Pose became unstable, resetting validation progress')
+      setValidation(prev => ({
+        ...prev,
+        progress: 0,
+        isValid: false,
+        message: 'Pose became unstable. Please hold still to continue.'
+      }))
+      confidenceHistoryRef.current.clear()
+    }
+  }, [poseStability])
 
   // Update confidence history when pose results change
   useEffect(() => {

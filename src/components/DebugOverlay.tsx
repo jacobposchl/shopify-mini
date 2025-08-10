@@ -17,6 +17,13 @@ interface DebugOverlayProps {
     stream: MediaStream | null
   }
   videoElement: HTMLVideoElement | null
+  poseStability?: {
+    isStable: boolean
+    stabilityScore: number
+    relevantLandmarks: number[]
+    velocityThreshold: number
+    currentVelocities: Map<number, number>
+  } | null
 }
 
 export function DebugOverlay({
@@ -24,7 +31,8 @@ export function DebugOverlay({
   onClose,
   poseDetectionStatus,
   cameraStatus,
-  videoElement
+  videoElement,
+  poseStability
 }: DebugOverlayProps) {
   const [tfBackend, setTfBackend] = useState<string>('Unknown')
   const [webglInfo, setWebglInfo] = useState<any>(null)
@@ -230,6 +238,52 @@ export function DebugOverlay({
                     {poseDetectionStatus.poseResults.landmarks?.length || 0}
                   </span>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pose Stability Information */}
+          {poseStability && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Pose Stability</h3>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span>Status:</span>
+                  <span className={poseStability.isStable ? 'text-green-600' : 'text-red-600'}>
+                    {poseStability.isStable ? '✅ Stable' : '❌ Unstable'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Stability Score:</span>
+                  <span className="font-mono">
+                    {Math.round(poseStability.stabilityScore * 100)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Velocity Threshold:</span>
+                  <span className="font-mono">
+                    {poseStability.velocityThreshold.toFixed(1)} px/frame
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Relevant Landmarks:</span>
+                  <span className="font-mono">
+                    {poseStability.relevantLandmarks.join(', ')}
+                  </span>
+                </div>
+                {poseStability.currentVelocities.size > 0 && (
+                  <div>
+                    <span className="block text-sm font-medium mb-2">Current Velocities:</span>
+                    <div className="space-y-1">
+                      {Array.from(poseStability.currentVelocities.entries()).map(([index, velocity]) => (
+                        <div key={index} className="flex justify-between text-sm">
+                          <span>Landmark {index}:</span>
+                          <span className="font-mono">{velocity.toFixed(2)} px/frame</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

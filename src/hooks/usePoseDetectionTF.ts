@@ -12,13 +12,24 @@ interface PoseResults {
   confidence: number
 }
 
-export const usePoseDetectionTF = () => {
+// Add pose stability tracking
+interface PoseStability {
+  isStable: boolean
+  velocityThreshold: number
+  relevantLandmarks: number[]
+  currentVelocities: Map<number, number>
+  stabilityScore: number
+}
+
+export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
   const [poseResults, setPoseResults] = useState<PoseResults | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
+  const [poseStability, setPoseStability] = useState<PoseStability | null>(null)
 
-  const modelRef = useRef<posenet.PoseNet | null>(null)
+  // Use 'any' type for now to avoid type conflicts, or we can use the actual return type from posenet.load()
+  const modelRef = useRef<any>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const animationRef = useRef<number | null>(null)
   const isDetectionRunningRef = useRef(false)
@@ -26,6 +37,142 @@ export const usePoseDetectionTF = () => {
   const consecutiveErrorsRef = useRef(0)
   const initializationAttemptsRef = useRef(0)
   const initializationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Add pose stability tracking refs
+  const previousLandmarksRef = useRef<Array<{ x: number; y: number; confidence: number }> | null>(null)
+  const lastStabilityUpdateRef = useRef<number>(0)
+  const selectedStyleIdRef = useRef<string | null>(null)
+  const stabilityStartTimeRef = useRef<number>(0)
+  const consecutiveStableFramesRef = useRef<number>(0)
+  const requiredStableFramesRef = useRef<number>(30) // Require 30 stable frames (about 1 second at 30fps)
+
+  // Function to get required stable frames based on threshold
+  const getRequiredStableFrames = useCallback((threshold: number): number => {
+    // Lower threshold = more strict = require more stable frames
+    // Higher threshold = more lenient = require fewer stable frames
+    if (threshold <= 100) return 20      // More lenient: 0.7 seconds
+    if (threshold <= 200) return 15     // More lenient: 0.5 seconds
+    if (threshold <= 300) return 10     // More lenient: 0.3 seconds
+    return 8                            // Very lenient: 0.3 seconds
+  }, [])
+
+  // Function to get relevant landmarks for clothing type
+  const getRelevantLandmarks = useCallback((styleId: string): number[] => {
+    const landmarkMap: { [key: string]: number[] } = {
+      'shirts': [5, 6, 7, 8, 11, 12], // shoulders, elbows, hips
+      'pants': [11, 12, 13, 14, 15, 16], // hips, knees, ankles
+      'shorts': [11, 12, 13, 14], // hips, knees
+      'jackets': [5, 6, 7, 8, 11, 12], // shoulders, elbows, hips
+      'activewear': [5, 6, 11, 12, 13, 14] // shoulders, hips, knees
+    }
+    return landmarkMap[styleId] || [5, 6, 11, 12] // default to shoulders and hips
+  }, [])
+
+  // Function to calculate pose stability with configurable threshold
+  const calculatePoseStability = useCallback((currentLandmarks: Array<{ x: number; y: number; confidence: number }>, styleId: string, stabilityThreshold: number = 200): PoseStability => {
+    const relevantLandmarks = getRelevantLandmarks(styleId)
+    const currentVelocities = new Map<number, number>()
+    let totalVelocity = 0
+    let validLandmarks = 0
+    const now = Date.now()
+
+    if (previousLandmarksRef.current) {
+      relevantLandmarks.forEach(index => {
+        if (currentLandmarks[index] && previousLandmarksRef.current![index]) {
+          const current = currentLandmarks[index]
+          const previous = previousLandmarksRef.current![index]
+          
+          // Calculate velocity (pixels per second)
+          // Use a more stable calculation by averaging over multiple frames
+          const dx = current.x - previous.x
+          const dy = current.y - previous.y
+          const velocity = Math.sqrt(dx * dx + dy * dy)
+          
+          // Apply confidence weighting to reduce noise
+          const confidence = current.confidence
+          const weightedVelocity = velocity * confidence
+          
+          currentVelocities.set(index, velocity)
+          totalVelocity += weightedVelocity
+          validLandmarks++
+        }
+      })
+    }
+
+    const avgVelocity = validLandmarks > 0 ? totalVelocity / validLandmarks : 0
+    
+    // Check if current frame is stable with some hysteresis
+    const isCurrentFrameStable = avgVelocity <= stabilityThreshold && validLandmarks >= relevantLandmarks.length * 0.7
+    
+    // Update stability tracking with hysteresis to prevent flickering
+    if (isCurrentFrameStable) {
+      if (consecutiveStableFramesRef.current === 0) {
+        // Start stability timer
+        stabilityStartTimeRef.current = now
+      }
+      consecutiveStableFramesRef.current++
+    } else {
+      // Only reset if we're significantly unstable (add hysteresis)
+      if (avgVelocity > stabilityThreshold * 1.5) {
+        consecutiveStableFramesRef.current = 0
+        stabilityStartTimeRef.current = 0
+      }
+    }
+
+    // Get required stable frames based on threshold
+    const requiredFrames = getRequiredStableFrames(stabilityThreshold)
+    
+    // Calculate stability score based on consecutive stable frames
+    const stabilityScore = Math.min(consecutiveStableFramesRef.current / requiredFrames, 1.0)
+    
+    // Consider pose stable if we have enough consecutive stable frames
+    const isStable = consecutiveStableFramesRef.current >= requiredFrames
+
+    return {
+      isStable,
+      velocityThreshold: stabilityThreshold,
+      relevantLandmarks,
+      currentVelocities,
+      stabilityScore
+    }
+  }, [getRelevantLandmarks])
+
+  // Function to update pose stability
+  const updatePoseStability = useCallback((landmarks: Array<{ x: number; y: number; confidence: number }>, styleId: string, stabilityThreshold: number = 200) => {
+    if (landmarks.length === 0) {
+      setPoseStability(null)
+      return
+    }
+
+    // Use default style if none provided
+    const effectiveStyleId = styleId || 'shirts' // Default to shirts if no style selected
+    
+    const stability = calculatePoseStability(landmarks, effectiveStyleId, stabilityThreshold)
+    setPoseStability(stability)
+    
+    // Update previous landmarks for next frame
+    previousLandmarksRef.current = landmarks
+    lastStabilityUpdateRef.current = Date.now()
+  }, [calculatePoseStability])
+
+  // Function to set the selected style for stability tracking
+  const setSelectedStyle = useCallback((styleId: string) => {
+    selectedStyleIdRef.current = styleId
+    // Reset stability when style changes
+    setPoseStability(null)
+    previousLandmarksRef.current = null
+    consecutiveStableFramesRef.current = 0
+    stabilityStartTimeRef.current = 0
+  }, [])
+
+  // Function to reset pose stability (called when pose becomes unstable)
+  const resetPoseStability = useCallback(() => {
+    setPoseStability(null)
+    previousLandmarksRef.current = null
+    lastStabilityUpdateRef.current = 0
+    consecutiveStableFramesRef.current = 0
+    stabilityStartTimeRef.current = 0
+  }, [])
 
   const initializePose = useCallback(async (video: HTMLVideoElement) => {
     if (isInitialized && modelRef.current) {
@@ -238,15 +385,15 @@ export const usePoseDetectionTF = () => {
       consecutiveErrorsRef.current = 0
 
       if (pose && pose.keypoints && pose.keypoints.length > 0) {
-        const landmarks = pose.keypoints.map((keypoint) => ({
+        const landmarks = pose.keypoints.map((keypoint: { position: { x: number; y: number }; score: number }) => ({
           x: keypoint.position.x,
           y: keypoint.position.y,
           confidence: keypoint.score
         }))
 
         // Calculate detection confidence
-        const avgConfidence = landmarks.reduce((sum, kp) => sum + kp.confidence, 0) / landmarks.length
-        const highConfidenceCount = landmarks.filter(kp => kp.confidence > 0.3).length
+        const avgConfidence = landmarks.reduce((sum: number, kp: { confidence: number }) => sum + kp.confidence, 0) / landmarks.length
+        const highConfidenceCount = landmarks.filter((kp: { confidence: number }) => kp.confidence > 0.3).length
         const isDetected = avgConfidence > 0.2 && highConfidenceCount >= 5
 
         // Log detection success periodically
@@ -264,6 +411,10 @@ export const usePoseDetectionTF = () => {
           isDetected,
           confidence: avgConfidence
         })
+
+        // Update pose stability
+        updatePoseStability(landmarks, selectedStyleIdRef.current || 'shirts', stabilityThreshold)
+
       } else {
         // No pose found, but don't log this as an error
         setPoseResults({
@@ -271,6 +422,8 @@ export const usePoseDetectionTF = () => {
           isDetected: false,
           confidence: 0
         })
+        // Reset stability if no pose
+        resetPoseStability()
       }
     } catch (err) {
       consecutiveErrorsRef.current++
@@ -287,9 +440,11 @@ export const usePoseDetectionTF = () => {
           isDetected: false,
           confidence: 0
         })
+        // Reset stability on error
+        resetPoseStability()
       }
     }
-  }, [isInitialized])
+  }, [isInitialized, updatePoseStability, resetPoseStability, stabilityThreshold])
 
   const startDetection = useCallback(() => {
     if (!isInitialized || !modelRef.current || !videoRef.current) {
@@ -390,7 +545,7 @@ export const usePoseDetectionTF = () => {
     
     return {
       modelLoaded: !!modelRef.current,
-      videoReady: video?.readyState >= 2,
+      videoReady: (video?.readyState ?? 0) >= 2,
       videoPlaying: !video?.paused,
       streamActive: stream?.active,
       detectionRunning: isDetectionRunningRef.current,
@@ -409,7 +564,10 @@ export const usePoseDetectionTF = () => {
     startDetection,
     stopDetection,
     cleanup,
-    getHealthStatus
+    getHealthStatus,
+    poseStability,
+    setSelectedStyle,
+    resetPoseStability
   }
 }
 
