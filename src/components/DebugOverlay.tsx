@@ -1,5 +1,5 @@
 // src/components/DebugOverlay.tsx
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Logger } from '../utils/Logger'
 
 interface DebugOverlayProps {

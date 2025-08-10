@@ -1,5 +1,4 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { useCamera } from '../hooks/useCamera'
 import { usePoseDetectionTF } from '../hooks/usePoseDetectionTF'
 import { usePoseValidation } from '../hooks/usePoseValidation'
 import { usePoseStability } from '../hooks/usePoseStability'
@@ -7,8 +6,7 @@ import { useFlowState } from '../hooks/useFlowState'
 import { DebugOverlay } from './DebugOverlay'
 import { ConfidenceThreshold } from './ConfidenceThreshold'
 import { Logger } from '../utils/Logger'
-import { Measurements as MeasurementsType } from '../types'
-import { POSENET_KEYPOINTS } from '../hooks/usePoseDetectionTF'
+import { Measurements as MeasurementsType, PoseResults } from '../types'
 import { getClothingInstructions } from '../data/poseRequirements'
 
 // Error boundary component
@@ -100,23 +98,30 @@ function GlobalErrorHooks() {
   useEffect(() => {
     const onErr = (e: ErrorEvent) => {
       const errorMsg = `${e.message}\n${e.error?.stack ?? ''}`
-      Logger.error('Global window error', { 
-        message: e.message, 
-        stack: e?.error?.stack,
-        filename: e.filename,
-        lineno: e.lineno,
-        colno: e.colno
-      })
+      console.error('Global error caught:', errorMsg)
       setMsg(errorMsg)
+      
+      // Auto-clear after 10 seconds
+      setTimeout(() => setMsg(null), 10000)
     }
     
     const onRej = (e: PromiseRejectionEvent) => {
-      const errorMsg = `unhandledrejection: ${e.reason?.message ?? e.reason}\n${e.reason?.stack ?? ''}`
-      Logger.error('Unhandled promise rejection', {
-        reason: e.reason?.message ?? e.reason,
-        stack: e.reason?.stack
-      })
+      const errorMsg = `Unhandled Promise Rejection: ${e.reason?.message || e.reason || 'Unknown error'}\n${e.reason?.stack || ''}`
+      console.error('Global promise rejection caught:', errorMsg)
+      
+      // Log additional context for debugging
+      if (e.reason instanceof Error) {
+        console.error('Rejection details:', {
+          name: e.reason.name,
+          message: e.reason.message,
+          stack: e.reason.stack
+        })
+      }
+      
       setMsg(errorMsg)
+      
+      // Auto-clear after 10 seconds
+      setTimeout(() => setMsg(null), 10000)
     }
     
     window.addEventListener('error', onErr)
@@ -133,31 +138,37 @@ function GlobalErrorHooks() {
   return (
     <div style={{
       position: 'fixed',
-      bottom: 12,
-      left: 12,
-      right: 12,
-      background: 'rgba(0,0,0,0.85)',
+      top: 0,
+      left: 0,
+      right: 0,
+      background: '#dc2626',
       color: '#fff',
-      zIndex: 99998,
-      padding: 12,
-      borderRadius: 12
+      zIndex: 99999,
+      padding: '12px 16px',
+      fontSize: 14,
+      fontFamily: 'monospace',
+      wordBreak: 'break-word',
+      maxHeight: '200px',
+      overflow: 'auto'
     }}>
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 6
+        alignItems: 'flex-start',
+        marginBottom: 8
       }}>
-        <strong>⚠️ Runtime Error</strong>
+        <strong>🚨 Runtime Error</strong>
         <button 
           onClick={() => setMsg(null)}
           style={{
-            background: '#333',
+            background: 'rgba(255,255,255,0.2)',
             color: '#fff',
             border: 'none',
             padding: '4px 8px',
-            borderRadius: 6,
-            cursor: 'pointer'
+            borderRadius: 4,
+            cursor: 'pointer',
+            fontSize: 12,
+            marginLeft: 16
           }}
         >
           Dismiss
@@ -166,7 +177,11 @@ function GlobalErrorHooks() {
       <pre style={{
         whiteSpace: 'pre-wrap',
         margin: 0,
-        fontSize: 12
+        fontSize: 12,
+        background: 'rgba(0,0,0,0.2)',
+        padding: 8,
+        borderRadius: 4,
+        overflow: 'auto'
       }}>
         {msg}
       </pre>
@@ -193,13 +208,12 @@ export function MeasurementsStepImpl({
 }: MeasurementsStepProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number | null>(null);
 
   const [measurements, setMeasurements] = useState<MeasurementsType | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [cameraError, setCameraError] = useState<string>('')
+  const [cameraStatus, setCameraStatus] = useState<string>('')
   const [showDebugOverlay, setShowDebugOverlay] = useState(false)
-  const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
   const [showMeasurements, setShowMeasurements] = useState(false)
   const [validationMessage, setValidationMessage] = useState<string>('')
   const [autoSkipCountdown, setAutoSkipCountdown] = useState<number>(0)
@@ -218,13 +232,13 @@ export function MeasurementsStepImpl({
     startDetectionWithRetry,
     stopDetection,
     cleanup,
-    getHealthStatus
+    getHealthStatus,
+    performHealthCheck
   } = usePoseDetectionTF()
 
   // Initialize pose stability tracking
   const {
     stability: poseStability,
-    resetStability,
     isStable: isPoseStable,
     stableLandmarksCount,
     totalLandmarksCount,
@@ -247,9 +261,7 @@ export function MeasurementsStepImpl({
 
   // Enhanced pose validation with stability
   const {
-    validation,
-    resetValidation,
-    requirements
+    validation
   } = usePoseValidation({
     poseResults,
     selectedStyleId,
@@ -273,18 +285,34 @@ export function MeasurementsStepImpl({
     })
   }, [selectedItemName, selectedCompanyName, selectedStyleName, selectedSubStyleName])
 
-  const headIndex = useMemo(() => {
-    if (!Array.isArray(POSENET_KEYPOINTS)) return 0
-    const wanted = ['nose', 'head', 'face', 'left_eye', 'right_eye', 'lefteye', 'righteye']
-    const idx = POSENET_KEYPOINTS.findIndex(k =>
-      typeof k === 'string' && wanted.some(w => k.toLowerCase().includes(w))
-    )
-    Logger.debug('HEAD_INDEX calculated', { 
-      index: idx >= 0 ? idx : 0, 
-      keypoints: POSENET_KEYPOINTS 
-    })
-    return idx >= 0 ? idx : 0
-  }, [])
+  // Periodic health check for pose detection to prevent timeouts
+  useEffect(() => {
+    if (!isPoseWarmingUp && isPoseInitialized && poseResults) {
+      // Only run health checks when pose detection is active
+      const healthCheckInterval = setInterval(async () => {
+        try {
+          const isHealthy = await performHealthCheck()
+          if (!isHealthy) {
+            Logger.warn('Pose detection health check failed, attempting recovery...')
+            // Try to recover by restarting detection
+            try {
+              await startDetectionWithRetry()
+              Logger.info('Pose detection recovered successfully')
+            } catch (recoveryErr) {
+              Logger.error('Pose detection recovery failed:', recoveryErr)
+              setCameraError('Pose detection became unstable. Please try again.')
+            }
+          }
+        } catch (err) {
+          Logger.warn('Health check error:', err)
+        }
+      }, 20000) // Increased from 10 seconds to 20 seconds to reduce overhead
+
+      return () => clearInterval(healthCheckInterval)
+    }
+  }, [isPoseWarmingUp, isPoseInitialized, poseResults, performHealthCheck, startDetectionWithRetry])
+
+
 
   // Sync canvas size and position to match video
   const syncCanvasToVideo = useCallback(() => {
@@ -473,33 +501,13 @@ export function MeasurementsStepImpl({
     })
   }, [poseResults, poseStability, stableLandmarksCount, totalLandmarksCount, stabilityProgress, isPoseStable])
 
-  const forceStartDetection = useCallback(() => {
-    Logger.info('Manual detection restart triggered')
-    if (!isPoseInitialized) {
-      Logger.warn('Cannot force start: Pose not initialized yet')
-      return
-    }
-    if (!videoRef.current) {
-      Logger.warn('Cannot force start: No video element')
-      return
-    }
-    try {
-      stopDetection()
-      Logger.info('Restarting pose detection...')
-      startDetectionWithRetry().then(() => {
-        Logger.info('Pose detection manually restarted successfully')
-      }).catch((err: Error) => {
-        Logger.error('Manual detection restart failed', { error: err.message })
-      })
-    } catch (err) {
-      Logger.error('Manual detection restart error', { error: (err as Error).message })
-    }
-  }, [isPoseInitialized, stopDetection, startDetection, startDetectionWithRetry])
+
 
   // Enhanced camera initialization
   const startCamera = useCallback(async () => {
     Logger.info('Starting camera initialization...');
     setCameraError('');
+    setCameraStatus('');
     setIsPoseWarmingUp(true);
     
     try {
@@ -531,25 +539,26 @@ export function MeasurementsStepImpl({
         Logger.info('Camera started successfully');
         setCameraStarted(true);
         
-        // Add a delay before initializing pose detection to ensure video is fully ready
+        // Reduced delay before initializing pose detection (from 1000ms to 500ms)
         Logger.info('Waiting for video to stabilize...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Initialize pose detection with proper loading phase
         Logger.info('Initializing pose detection...');
-        setCameraError('Initializing pose detection model...');
+        setCameraStatus('Initializing pose detection model...');
         await initializePose(videoRef.current);
         
-        // Add another delay before starting detection to ensure model is fully ready
+        // Reduced delay before starting detection (from 1000ms to 500ms)
         Logger.info('Waiting for model to stabilize...');
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced from 2000ms
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         Logger.info('Starting pose detection...');
-        setCameraError('Starting pose detection...');
+        setCameraStatus('Starting pose detection...');
         await startDetectionWithRetry();
         
         Logger.info('Pose detection started successfully');
         setIsPoseWarmingUp(false);
+        setCameraStatus('Pose detection started successfully');
         setCameraError('');
       } else {
         throw new Error('Video element not available');
@@ -567,7 +576,19 @@ export function MeasurementsStepImpl({
         } else if (error.message.includes('NotReadableError') || error.message.includes('TrackStartError')) {
           errorMessage = 'Camera is in use by another application. Please close other camera apps and try again.';
         } else if (error.message.includes('Pose detection failed')) {
-          errorMessage = `Pose detection failed: ${error.message}`;
+          // Extract the specific pose detection error
+          const poseError = error.message.replace('Pose detection failed: ', '');
+          if (poseError.includes('timed out')) {
+            errorMessage = 'Pose detection is taking longer than expected. This may happen on slower devices. Please try again.';
+          } else if (poseError.includes('Model failed to become ready')) {
+            errorMessage = 'Pose detection model failed to initialize. Please refresh the page and try again.';
+          } else if (poseError.includes('WebGL')) {
+            errorMessage = 'Graphics processing issue detected. Please refresh the page and try again.';
+          } else if (poseError.includes('initialization timed out')) {
+            errorMessage = 'Pose detection initialization is taking longer than expected. Please try again or refresh the page.';
+          } else {
+            errorMessage = `Pose detection failed: ${poseError}`;
+          }
         } else {
           errorMessage = `Camera error: ${error.message}`;
         }
@@ -710,6 +731,47 @@ export function MeasurementsStepImpl({
     setTimeout(() => {
       startCamera()
     }, 500)
+  }
+
+  // Enhanced retry specifically for pose detection failures
+  const retryPoseDetection = async () => {
+    Logger.info('User requested pose detection retry')
+    setCameraError('')
+    
+    try {
+      // Clean up pose detection but keep camera stream
+      stopDetection()
+      setIsPoseWarmingUp(false)
+      
+      // Reduced wait time for cleanup (from 1000ms to 500ms)
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Re-initialize pose detection with the existing video stream
+      if (videoRef.current && videoRef.current.srcObject) {
+        Logger.info('Re-initializing pose detection with existing video stream')
+        setCameraStatus('Re-initializing pose detection...')
+        setIsPoseWarmingUp(true)
+        
+        await initializePose(videoRef.current)
+        
+        // Reduced delay for model stabilization (from 1000ms to 500ms)
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Start detection with retry
+        await startDetectionWithRetry()
+        
+        Logger.info('Pose detection re-initialized successfully')
+        setIsPoseWarmingUp(false)
+        setCameraStatus('Pose detection re-started successfully')
+        setCameraError('')
+      } else {
+        throw new Error('No video stream available for pose detection retry')
+      }
+    } catch (error) {
+      Logger.error('Pose detection retry failed:', error)
+      setCameraError('Failed to restart pose detection. Please try the full camera retry.')
+      setIsPoseWarmingUp(false)
+    }
   }
 
   const debugCameraStatus = () => {
@@ -887,7 +949,6 @@ Errors: ${poseHealth.consecutiveErrors}
         {!isInitialCountdownActive && (
           <ConfidenceThreshold
             validation={validation}
-            requirements={[]}
             stabilityProgress={stabilityProgress}
             isVisible={Boolean(!measurements && !isProcessing && selectedStyleId && poseResults?.isDetected)}
           />
@@ -925,11 +986,11 @@ Errors: ${poseHealth.consecutiveErrors}
                       : 'Setting up camera access and video stream...'
                     }
                   </p>
-                  {cameraError && (
+                  {cameraStatus && (
                     <div className="bg-blue-600/20 border border-blue-600/30 rounded-md p-3 mb-4">
-                      <p className="text-blue-800 text-sm">{cameraError}</p>
+                        <p className="text-blue-800 text-sm">{cameraStatus}</p>
                     </div>
-                  )}
+                    )}
                   <div className="flex gap-2 justify-center">
                     <button
                       onClick={startCamera}
@@ -970,6 +1031,15 @@ Errors: ${poseHealth.consecutiveErrors}
                 >
                   Try Again
                 </button>
+                {/* Add pose detection retry button for pose-specific errors */}
+                {cameraError.includes('Pose detection') && (
+                  <button
+                    onClick={retryPoseDetection}
+                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-green-700"
+                  >
+                    Retry Pose Detection
+                  </button>
+                )}
                 <button
                   onClick={debugCameraStatus}
                   className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700"
@@ -1018,7 +1088,7 @@ Errors: ${poseHealth.consecutiveErrors}
               </button>
               <button
                 onClick={handleTakeMeasurement}
-                disabled={!poseResults?.isDetected || !canTakeMeasurement}
+                disabled={!poseResults?.isDetected}
                 className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
               >
                 {isPoseStable ? 'Take Measurement' : 

@@ -17,8 +17,7 @@ export function App() {
     setMeasurements,
     setRecommendations,
     resetFlow,
-    goToNextStep,
-    goToPreviousStep
+    goToNextStep
   } = useFlowState()
 
   const handleCompanySelect = (company: any) => {

@@ -1,15 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-
-// Define PoseResults interface locally since it's not exported from types
-interface PoseResults {
-  isDetected: boolean
-  confidence: number
-  landmarks: Array<{
-    x: number
-    y: number
-    confidence: number
-  }>
-}
+import { PoseResults } from '../types'
 
 interface LandmarkVelocity {
   x: number
