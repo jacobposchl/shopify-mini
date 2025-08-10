@@ -105,7 +105,7 @@ export const companies: Company[] = [
   {
     id: 'michael kors',
     name: 'michael kors',
-    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/5c/fa/84/5cfa8485-4acd-7517-1234-413a6ce2a44f/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/b9/7c/ea/b97cea57-e803-eaa2-8711-0dab753e58a8/AppIcon-1x_U007emarketing-0-10-0-85-220-0.png/1200x600wa.png',
     description: ''
   },
   {
