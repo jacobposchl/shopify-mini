@@ -1213,7 +1213,7 @@ export function MeasurementsStepImpl({
         } else {
           // This is a real error
           Logger.error('Real pose detection error occurred')
-          setCameraError(`Camera working but pose detection failed: ${poseErrorMessage}. You can still use manual measurements.`)
+          setCameraError(`The camera will be used to calculate your measurements`)
           return
         }
       }
@@ -1252,20 +1252,30 @@ export function MeasurementsStepImpl({
   const setupPoseDetectionRetry = useCallback(() => {
     Logger.info('Setting up pose detection auto-retry...')
     
+    // Clear any existing timer
+    if (retryTimerRef.current) {
+      clearInterval(retryTimerRef.current)
+    }
+    
     const checkInterval = 500 // Check every 500ms
-    const maxRetries = 60 // Maximum 30 seconds (60 * 500ms)
+    const maxRetries = 60 // Maximum 30 seconds
     let retryCount = 0
     
-    const retryTimer = setInterval(async () => {
+    retryTimerRef.current = setInterval(async () => {
       retryCount++
       const poseStatus = checkPoseDetectionStatus()
       
       Logger.debug(`Pose detection retry ${retryCount}/${maxRetries}, status: ${poseStatus}`)
       
       if (poseStatus === 'ready' && videoRef.current) {
-        // Pose detection is now ready!
+        // Success - pose detection is ready
         Logger.info('Pose detection became ready, attempting to start...')
-        clearInterval(retryTimer)
+        
+        if (retryTimerRef.current) {
+          clearInterval(retryTimerRef.current)
+          retryTimerRef.current = null
+        }
+        
         setIsPoseDetectionWaiting(false)
         
         try {
@@ -1277,9 +1287,14 @@ export function MeasurementsStepImpl({
         }
         
       } else if (poseStatus === 'error' || retryCount >= maxRetries) {
-        // Real error or timeout
+        // Failure - real error or timeout
         Logger.warn('Giving up on pose detection retry', { poseStatus, retryCount })
-        clearInterval(retryTimer)
+        
+        if (retryTimerRef.current) {
+          clearInterval(retryTimerRef.current)
+          retryTimerRef.current = null
+        }
+        
         setIsPoseDetectionWaiting(false)
         
         if (retryCount >= maxRetries) {
@@ -1288,12 +1303,7 @@ export function MeasurementsStepImpl({
           setCameraError('Pose detection failed to initialize. You can still use manual measurements.')
         }
       }
-      
-      // Continue waiting if status is still 'loading' or 'not-started'
     }, checkInterval)
-    
-    // Store the timer so we can clean it up if needed
-    return retryTimer
   }, [checkPoseDetectionStatus, startDetection])
 
   const handleTakeMeasurement = () => {
@@ -1431,6 +1441,21 @@ export function MeasurementsStepImpl({
     }
   }, [poseError])
 
+  // Add LoadingOverlay component definition here - BEFORE return statement
+  const LoadingOverlay = () => (
+    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+      <div className="bg-white bg-opacity-90 rounded-lg p-6 text-center shadow-lg">
+        <div className="flex items-center justify-center mb-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+          <span className="text-lg font-semibold text-gray-800">Loading pose detection...</span>
+        </div>
+        <p className="text-sm text-gray-600">
+          Initializing AI model for automatic measurements
+        </p>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen flex flex-col bg-black">
       {/* Header */}
@@ -1460,20 +1485,6 @@ export function MeasurementsStepImpl({
         </div>
       </header>
 
-      // Add this loading overlay component definition here
-      const LoadingOverlay = () => (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
-          <div className="bg-white bg-opacity-90 rounded-lg p-6 text-center shadow-lg">
-            <div className="flex items-center justify-center mb-3">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-              <span className="text-lg font-semibold text-gray-800">Loading pose detection...</span>
-            </div>
-            <p className="text-sm text-gray-600">
-              Initializing AI model for automatic measurements
-            </p>
-          </div>
-        </div>
-      )
       
       {/* Main content area */}
       <main className="relative flex-1 overflow-hidden">
@@ -1533,27 +1544,21 @@ export function MeasurementsStepImpl({
         {cameraError && !isDemoMode && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 p-4">
             <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              <div className="w-16 h-16 mx-auto mb-4 bg-yellow-100 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Camera Issue</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Warning</h3>
               <p className="text-sm text-gray-600 mb-4">{cameraError}</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={retryCamera}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700"
-                >
-                  Try Again
-                </button>
-                <button
-                  onClick={enableDemoMode}
-                  className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200"
-                >
-                  Demo Mode
-                </button>
-              </div>
+                             <div className="flex gap-3">
+                 <button
+                   onClick={retryCamera}
+                   className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700"
+                 >
+                   Agree
+                 </button>
+               </div>
             </div>
           </div>
         )}
