@@ -37,7 +37,115 @@ export const companies: Company[] = [
     name: 'H&M',
     logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/44/02/c2/4402c2d0-c62f-b817-1287-63a91581c8dd/AppIcon-0-0-1x_U007emarketing-0-8-0-0-85-220.png/1200x600wa.png',
     description: ''
-  }
+  },
+  {
+  id: 'puma',
+  name: 'Puma',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/bc/14/53/bc14533c-6c03-9a99-abb9-54359823facf/AppIcon-0-0-1x_U007emarketing-0-6-0-85-220.png/1200x600wa.png',
+  description: ''
+},
+{
+  id: 'new-balance',
+  name: 'New Balance',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/c5/72/6e/c5726e35-dbcb-dafe-b06b-c54382336487/AppIcon-0-0-1x_U007emarketing-0-7-0-85-220.png/1200x600wa.png',
+  description: ''
+},
+{
+  id: 'the-north-face',
+  name: 'The North Face',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/3a/7c/7e/3a7c7eaa-8053-50f8-64c7-1ed637082d08/AppIcon-0-0-1x_U007epad-0-9-0-sRGB-85-220.png/1200x600wa.png',
+  description: ''
+},
+{
+  id: 'levis',
+  name: "Levi's",
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/7b/20/75/7b2075d9-7ece-fc25-0ce6-c626ecabd330/AppIcon-0-0-1x_U007emarketing-0-0-0-8-0-0-85-220.png/1200x630wa.png',
+  description: ''
+},
+{
+  id: 'sketchers',
+  name: 'Sketchers',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/cc/04/49/cc044961-208f-cc09-5fde-18a1b6eef59b/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
+  description: ''
+},
+{
+  id: 'converse',
+  name: 'Converse',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/97/af/0c/97af0cbc-725a-67e4-9c01-d6b542492b80/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x630wa.png',
+  description: ''
+},
+{
+    id: 'test1',
+    name: 'test1',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/f5/e8/6b/f5e86b54-5abc-248c-66c4-b3df20f8c691/AppIcon-0-0-1x_U007ephone-0-1-0-85-220.png/1200x600wa.png',
+    description: ''
+  },
+  {
+    id: 'test2',
+    name: 'test2',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/df/26/cf/df26cf2c-2980-1ebc-7354-064751cd3adc/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x630wa.png',
+    description: ''
+  },
+  {
+    id: 'test3',
+    name: 'test3',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/8e/2e/f6/8e2ef607-663f-696f-d908-a54f0d5fdd5b/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
+    description: ''
+  },
+  {
+    id: 'test4',
+    name: 'test4',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/9b/21/95/9b2195e9-e161-270a-9a8f-da0e87c7a366/AppIcon-1x_U007emarketing-0-0-0-6-0-0-sRGB-85-220-0.png/1200x630wa.png',
+    description: ''
+  },
+  {
+    id: 'test5',
+    name: 'test5',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/5c/fa/84/5cfa8485-4acd-7517-1234-413a6ce2a44f/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
+    description: ''
+  },
+  {
+    id: 'test6',
+    name: 'test6',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/44/02/c2/4402c2d0-c62f-b817-1287-63a91581c8dd/AppIcon-0-0-1x_U007emarketing-0-8-0-0-85-220.png/1200x600wa.png',
+    description: ''
+  },
+  {
+  id: 'test7',
+  name: 'test7',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/bc/14/53/bc14533c-6c03-9a99-abb9-54359823facf/AppIcon-0-0-1x_U007emarketing-0-6-0-85-220.png/1200x600wa.png',
+  description: ''
+},
+{
+  id: 'test8',
+  name: 'test8',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/c5/72/6e/c5726e35-dbcb-dafe-b06b-c54382336487/AppIcon-0-0-1x_U007emarketing-0-7-0-85-220.png/1200x600wa.png',
+  description: ''
+},
+{
+  id: 'test9',
+  name: 'test9',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/3a/7c/7e/3a7c7eaa-8053-50f8-64c7-1ed637082d08/AppIcon-0-0-1x_U007epad-0-9-0-sRGB-85-220.png/1200x600wa.png',
+  description: ''
+},
+{
+  id: 'test10',
+  name: "test10",
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/7b/20/75/7b2075d9-7ece-fc25-0ce6-c626ecabd330/AppIcon-0-0-1x_U007emarketing-0-0-0-8-0-0-85-220.png/1200x630wa.png',
+  description: ''
+},
+{
+  id: 'test11',
+  name: 'test11',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/cc/04/49/cc044961-208f-cc09-5fde-18a1b6eef59b/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
+  description: ''
+},
+{
+  id: 'test12',
+  name: 'test12',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/97/af/0c/97af0cbc-725a-67e4-9c01-d6b542492b80/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x630wa.png',
+  description: ''
+}
 ]
 
 // Kept untyped on purpose, since your Style interface doesn’t include iconUrl.
@@ -52,7 +160,6 @@ export const styles = [
 // Substyles only for the 4 visible style categories (no dresses/activewear to avoid unreachable options)
 export const subStyles: SubStyle[] = [
   // Shirts
-<<<<<<< HEAD
   { id: 'crew-neck',   name: 'Crew Neck',   styleId: 'shirts',
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/3126/3126092.png' },
   { id: 'v-neck',      name: 'V-Neck',      styleId: 'shirts',
@@ -86,28 +193,6 @@ export const subStyles: SubStyle[] = [
   { id: 'windbreaker', name: 'Windbreaker', styleId: 'jackets',
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/614/614281.png' },
 
-=======
-  { id: 'crew-neck',   name: 'Crew Neck',   styleId: 'shirts', description: 'Classic round neck t-shirt' },
-  { id: 'v-neck',      name: 'V-Neck',      styleId: 'shirts', description: 'V-shaped neckline t-shirt' },
-  { id: 'button-down', name: 'Button Down', styleId: 'shirts', description: 'Button-up collared shirt' },
-  { id: 'polo',        name: 'Polo',        styleId: 'shirts', description: 'Collared polo shirt' },
-
-  // Pants
-  { id: 'jeans',       name: 'Jeans',       styleId: 'pants', description: 'Denim jeans' },
-  { id: 'joggers',     name: 'Joggers',     styleId: 'pants', description: 'Athletic jogger pants' },
-  { id: 'dress-pants', name: 'Dress Pants', styleId: 'pants', description: 'Formal dress pants' },
-  { id: 'leggings',    name: 'Leggings',    styleId: 'pants', description: 'Fitted athletic leggings' },
-
-  // Shorts
-  { id: 'athletic-shorts', name: 'Athletic Shorts', styleId: 'shorts', description: 'Sports athletic shorts' },
-  { id: 'casual-shorts',   name: 'Casual Shorts',   styleId: 'shorts', description: 'Casual everyday shorts' },
-  { id: 'dress-shorts',    name: 'Dress Shorts',    styleId: 'shorts', description: 'Formal dress shorts' },
-
-  // Jackets
-  { id: 'hoodie',      name: 'Hoodie',      styleId: 'jackets', description: 'Hooded sweatshirt' },
-  { id: 'blazer',      name: 'Blazer',      styleId: 'jackets', description: 'Formal blazer jacket' },
-  { id: 'windbreaker', name: 'Windbreaker', styleId: 'jackets', description: 'Lightweight windbreaker jacket' },
->>>>>>> 5d1f5df3e5f09bbbed060fe0c71f1472daa3843c
 ]
 
 

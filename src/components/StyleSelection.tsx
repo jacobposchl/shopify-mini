@@ -1,11 +1,11 @@
-
+import React from 'react'
 import type { Style } from '../types'
 import { styles } from '../data/mockData'
 
 interface StyleSelectionProps {
   onStyleSelect: (style: Style) => void
   selectedStyle?: Style
-  selectedCompanyName?: string // kept for compatibility; not rendered
+  selectedCompanyName?: string // not rendered
   onBack?: () => void
 }
 
@@ -35,16 +35,19 @@ export function StyleSelection({
           <div className="mb-1">
             <span className="text-sm font-medium text-white">Step 2 of 6</span>
           </div>
-          <h1 className="text-xl font-bold text-white">Choose Your Style</h1>
+          <h1 className="text-2xl font-extrabold text-white">Choose Your Style</h1>
           <p className="text-sm text-white/80">What type of clothing are you looking for?</p>
         </div>
       </header>
 
+      {/* Transparent tiles with white outline */}
       <main className="px-4 py-6">
         <div className="grid grid-cols-2 gap-4">
           {styles.map((style) => {
             const isSelected = selectedStyle?.id === style.id
-            const imgSrc = (isSelected && (style as any).iconSelectedUrl) ? (style as any).iconSelectedUrl : (style as any).iconUrl
+            const imgSrc = (isSelected && (style as any).iconSelectedUrl)
+              ? (style as any).iconSelectedUrl
+              : (style as any).iconUrl
 
             return (
               <button
@@ -52,13 +55,15 @@ export function StyleSelection({
                 onClick={() => onStyleSelect(style)}
                 aria-pressed={isSelected}
                 aria-label={`${style.name}${isSelected ? ' selected' : ''}`}
-                className={`bg-white rounded-lg overflow-hidden transition-all border focus:outline-none ${
-                  isSelected
-                    ? 'ring-2 ring-blue-500 border-blue-200 shadow-md'
-                    : 'border-gray-200 hover:shadow-md focus:ring-2 focus:ring-black/10'
-                }`}
+                className={[
+                  'rounded-2xl border-2 bg-transparent',
+                  'transition-all focus:outline-none',
+                  'border-white/70 hover:border-white/90 focus:ring-2 focus:ring-white/40',
+                  isSelected ? 'ring-2 ring-white border-white bg-white/10' : '',
+                  'px-4 py-6' // internal padding to mimic card
+                ].join(' ')}
               >
-                <div className="p-6 text-center flex flex-col items-center">
+                <div className="text-center flex flex-col items-center">
                   {imgSrc ? (
                     <img
                       src={imgSrc}
@@ -69,15 +74,15 @@ export function StyleSelection({
                       loading="eager"
                     />
                   ) : (
-                    <span className="text-4xl mb-3" aria-hidden>
+                    <span className="text-4xl mb-3 text-white" aria-hidden>
                       {(style as any).icon}
                     </span>
                   )}
-                  <h3 className="font-semibold text-gray-900 text-xl md:text-2xl leading-tight mb-1">
+                  <h3 className="font-semibold text-white text-xl md:text-2xl leading-tight mb-1">
                     {style.name}
                   </h3>
                   {(style as any).description ? (
-                    <p className="text-sm text-gray-500">{(style as any).description}</p>
+                    <p className="text-sm text-white/80">{(style as any).description}</p>
                   ) : null}
                 </div>
               </button>
@@ -88,5 +93,3 @@ export function StyleSelection({
     </div>
   )
 }
-
-
