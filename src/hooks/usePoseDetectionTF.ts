@@ -281,6 +281,14 @@ export const usePoseDetectionTF = () => {
         console.log('🔄 TF.js: Too many errors, attempting recovery...')
         consecutiveErrorsRef.current = 0
         
+        // Check if video is still available
+        if (!videoRef.current || !videoRef.current.srcObject) {
+          console.log('🔄 TF.js: Video no longer available, stopping detection')
+          // Set a flag to stop detection instead of calling stopDetection directly
+          isDetectionRunningRef.current = false
+          return
+        }
+        
         // Reset pose results but don't stop detection
         setPoseResults({
           landmarks: [],
@@ -301,12 +309,18 @@ export const usePoseDetectionTF = () => {
       return Promise.reject(new Error('Pose detection not initialized'))
     }
 
+    // Check if video is still available and has a valid stream
+    if (!videoRef.current.srcObject) {
+      console.log('❌ TF.js: Cannot start detection - no video stream')
+      return Promise.reject(new Error('No video stream available'))
+    }
+
     if (isDetectionRunningRef.current) {
       console.log('⚠️ TF.js: Detection already running')
       return Promise.resolve()
     }
 
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       console.log('🚀 TF.js: Starting pose detection loop...')
       isDetectionRunningRef.current = true
       consecutiveErrorsRef.current = 0
@@ -318,6 +332,13 @@ export const usePoseDetectionTF = () => {
         // Check if detection should continue
         if (!isDetectionRunningRef.current) {
           console.log('🛑 TF.js: Detection stopped')
+          return
+        }
+
+        // Check if video is still available
+        if (!videoRef.current || !videoRef.current.srcObject) {
+          console.log('🛑 TF.js: Video no longer available, stopping detection')
+          isDetectionRunningRef.current = false
           return
         }
 
@@ -350,6 +371,108 @@ export const usePoseDetectionTF = () => {
       runDetection()
     })
   }, [isInitialized, detectPose])
+
+  // New function: Wait for pose detection to be ready with retries
+  const waitForReadiness = useCallback(async (): Promise<void> => {
+    const maxAttempts = 15; // Increased attempts but with shorter delays
+    const maxWaitTime = 10000; // 10 second maximum wait time
+    let attempt = 0;
+    const startTime = Date.now();
+    
+    while (attempt < maxAttempts) {
+      // Check if we've exceeded the maximum wait time
+      if (Date.now() - startTime > maxWaitTime) {
+        throw new Error('Pose detection readiness check timed out');
+      }
+      
+      // Check basic requirements
+      if (!isInitialized || !modelRef.current || !videoRef.current) {
+        console.log(`Waiting for basic requirements... attempt ${attempt + 1}/${maxAttempts}`);
+        await new Promise(resolve => setTimeout(resolve, 200)); // Shorter delay
+        attempt++;
+        continue;
+      }
+
+      // Check if video is actually ready - use a more lenient check
+      if (videoRef.current.readyState < 2) { // HAVE_CURRENT_DATA instead of HAVE_FUTURE_DATA
+        console.log(`Waiting for video to be ready... attempt ${attempt + 1}/${maxAttempts}, readyState: ${videoRef.current.readyState}`);
+        await new Promise(resolve => setTimeout(resolve, 200)); // Shorter delay
+        attempt++;
+        continue;
+      }
+
+      // Check if video has valid dimensions
+      if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+        console.log(`Waiting for video dimensions... attempt ${attempt + 1}/${maxAttempts}, dimensions: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
+        await new Promise(resolve => setTimeout(resolve, 200)); // Shorter delay
+        attempt++;
+        continue;
+      }
+
+      // Test if model can actually process frames
+      try {
+        console.log('Testing model readiness with dummy frame...');
+        const dummyCanvas = document.createElement('canvas');
+        dummyCanvas.width = 640;
+        dummyCanvas.height = 480;
+        const dummyCtx = dummyCanvas.getContext('2d');
+        if (dummyCtx) {
+          // Create a simple test image
+          dummyCtx.fillStyle = 'black';
+          dummyCtx.fillRect(0, 0, 640, 480);
+          
+          // Try to run pose detection on the dummy frame
+          const testResult = await modelRef.current.estimateSinglePose(dummyCanvas, {
+            flipHorizontal: false
+          });
+          
+          console.log('Model readiness test successful!');
+          return; // Model is truly ready
+        }
+      } catch (error) {
+        console.warn(`Model readiness test failed: ${error}`);
+        await new Promise(resolve => setTimeout(resolve, 200)); // Shorter delay
+        attempt++;
+        continue;
+      }
+    }
+    
+    throw new Error('Model failed to become ready after maximum attempts');
+  }, [isInitialized]);
+
+  // Enhanced startDetection with automatic readiness waiting
+  const startDetectionWithRetry = useCallback(async (maxRetries = 3, retryDelay = 1000) => {
+    console.log('🚀 TF.js: Starting detection with retry mechanism...')
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // First, wait for readiness
+        console.log(`🔄 TF.js: Attempt ${attempt}/${maxRetries} - Waiting for readiness...`)
+        await waitForReadiness()
+        
+        // Then start detection
+        console.log(`🔄 TF.js: Attempt ${attempt}/${maxRetries} - Starting detection...`)
+        await startDetection()
+        console.log(`✅ TF.js: Detection started successfully on attempt ${attempt}`)
+        return
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+        console.warn(`⚠️ TF.js: Detection attempt ${attempt} failed:`, errorMsg)
+        
+        if (attempt < maxRetries) {
+          console.log(`🔄 TF.js: Retrying in ${retryDelay}ms...`)
+          await new Promise(resolve => setTimeout(resolve, retryDelay))
+          // Exponential backoff
+          retryDelay = Math.min(retryDelay * 1.5, 5000)
+        } else {
+          console.error('❌ TF.js: All detection attempts failed')
+          // Set a more specific error message
+          setError(`Pose detection failed after ${maxRetries} attempts: ${errorMsg}`)
+          throw new Error(`Pose detection failed: ${errorMsg}`)
+        }
+      }
+    }
+  }, [waitForReadiness, startDetection])
 
   const stopDetection = useCallback(() => {
     console.log('🛑 TF.js: Stopping pose detection...')
@@ -390,7 +513,7 @@ export const usePoseDetectionTF = () => {
     
     return {
       modelLoaded: !!modelRef.current,
-      videoReady: video?.readyState >= 2,
+      videoReady: video?.readyState !== undefined && video.readyState >= 2,
       videoPlaying: !video?.paused,
       streamActive: stream?.active,
       detectionRunning: isDetectionRunningRef.current,
@@ -407,6 +530,8 @@ export const usePoseDetectionTF = () => {
     error,
     initializePose,
     startDetection,
+    startDetectionWithRetry,
+    waitForReadiness,
     stopDetection,
     cleanup,
     getHealthStatus

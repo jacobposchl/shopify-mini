@@ -1,12 +1,15 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Measurements, MeasurementValidation } from '../types'
-import { usePoseDetectionTF, POSENET_KEYPOINTS } from '../hooks/usePoseDetectionTF'
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { useCamera } from '../hooks/useCamera'
+import { usePoseDetectionTF } from '../hooks/usePoseDetectionTF'
 import { usePoseValidation } from '../hooks/usePoseValidation'
-import { Logger } from '../utils/Logger'
+import { usePoseStability } from '../hooks/usePoseStability'
+import { useFlowState } from '../hooks/useFlowState'
 import { DebugOverlay } from './DebugOverlay'
 import { ConfidenceThreshold } from './ConfidenceThreshold'
+import { Logger } from '../utils/Logger'
+import { Measurements as MeasurementsType } from '../types'
+import { POSENET_KEYPOINTS } from '../hooks/usePoseDetectionTF'
 import { getClothingInstructions } from '../data/poseRequirements'
-import React from 'react'
 
 // Error boundary component
 class InAppErrorBoundary extends React.Component<
@@ -172,7 +175,7 @@ function GlobalErrorHooks() {
 }
 
 interface MeasurementsStepProps {
-  onMeasurementsComplete: (measurements: Measurements) => void
+  onMeasurementsComplete: (measurements: MeasurementsType) => void
   selectedItemName?: string
   selectedCompanyName?: string
   selectedStyleName?: string
@@ -188,16 +191,22 @@ export function MeasurementsStepImpl({
   selectedSubStyleName,
   selectedStyleId
 }: MeasurementsStepProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const hasBootedRef = useRef(false)
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number | null>(null);
 
-  const [measurements, setMeasurements] = useState<Measurements | null>(null)
+  const [measurements, setMeasurements] = useState<MeasurementsType | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [cameraError, setCameraError] = useState<string>('')
-  const [isDemoMode, setIsDemoMode] = useState(false)
   const [showDebugOverlay, setShowDebugOverlay] = useState(false)
   const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
+  const [showMeasurements, setShowMeasurements] = useState(false)
+  const [validationMessage, setValidationMessage] = useState<string>('')
+  const [autoSkipCountdown, setAutoSkipCountdown] = useState<number>(0)
+  const [initialCountdown, setInitialCountdown] = useState<number>(5)
+  const [isInitialCountdownActive, setIsInitialCountdownActive] = useState<boolean>(true)
+  const [cameraStarted, setCameraStarted] = useState<boolean>(false)
+  const [isPoseWarmingUp, setIsPoseWarmingUp] = useState<boolean>(false)
 
   const {
     poseResults,
@@ -206,23 +215,50 @@ export function MeasurementsStepImpl({
     error: poseError,
     initializePose,
     startDetection,
+    startDetectionWithRetry,
     stopDetection,
     cleanup,
     getHealthStatus
   } = usePoseDetectionTF()
 
-  // Pose validation hook for confidence thresholds
+  // Initialize pose stability tracking
+  const {
+    stability: poseStability,
+    resetStability,
+    isStable: isPoseStable,
+    stableLandmarksCount,
+    totalLandmarksCount,
+    stabilityProgress,
+    message: stabilityMessage
+  } = usePoseStability({
+    poseResults,
+    stabilityThreshold: 2.0, // 2 pixels per frame
+    requiredStabilityDuration: 2000, // 2 seconds
+    requiredStableLandmarksRatio: 0.7, // 70% of landmarks must be stable
+    onStabilityChange: (stability) => {
+      Logger.info('Pose stability changed', {
+        isStable: stability.isStable,
+        stableLandmarks: stability.stableLandmarksCount,
+        totalLandmarks: stability.totalLandmarksCount,
+        progress: stability.stabilityProgress
+      })
+    }
+  })
+
+  // Enhanced pose validation with stability
   const {
     validation,
-    resetValidation
+    resetValidation,
+    requirements
   } = usePoseValidation({
     poseResults,
     selectedStyleId,
-    onValidationComplete: (validation: MeasurementValidation) => {
-      Logger.info('Pose validation complete', { validation })
-      // Auto-enable measurement button when validation is complete
+    isPoseStable, // Pass stability status to validation
+    onValidationComplete: (validation) => {
+      Logger.info('Pose validation complete', validation)
       if (validation.isValid) {
-        setCanTakeMeasurement(true)
+        setShowMeasurements(true)
+        setValidationMessage('Pose requirements met and stable! Taking measurements...')
       }
     }
   })
@@ -302,7 +338,7 @@ export function MeasurementsStepImpl({
     })
   }, [])
 
-  // Draw pose landmarks on canvas
+  // Enhanced canvas drawing with lines between landmarks and stability indicators
   useEffect(() => {
     if (!canvasRef.current || !poseResults || !poseResults.isDetected) return
 
@@ -318,40 +354,124 @@ export function MeasurementsStepImpl({
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // Set drawing style
+    // Define connections between keypoints (PoseNet skeleton)
+    const keypointConnections = [
+      // Head and torso
+      [0, 1], [1, 3], [0, 2], [2, 4], // nose to eyes to ears
+      [5, 6], // shoulders
+      [5, 7], [7, 9], // left arm
+      [6, 8], [8, 10], // right arm
+      [5, 11], [6, 12], // shoulders to hips
+      [11, 12], // hips
+      [11, 13], [13, 15], // left leg
+      [12, 14], [14, 16] // right leg
+    ]
+
+    // Draw connections (skeleton lines)
     ctx.strokeStyle = '#00ff00'
     ctx.lineWidth = 2
-    ctx.fillStyle = '#00ff00'
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
 
-    // Draw keypoints
-    poseResults.landmarks.forEach((landmark, index) => {
-      if (landmark.confidence > 0.3) {
-        // Transform coordinates from video space to canvas space
-        // Account for object-contain scaling and centering
-        // Since the canvas has -scale-x-100 applied, we need to flip the x-coordinate
-        const x = canvas.width - ((landmark.x * scale) + offsetX)
-        const y = (landmark.y * scale) + offsetY
+    keypointConnections.forEach(([startIdx, endIdx]) => {
+      const startLandmark = poseResults.landmarks[startIdx]
+      const endLandmark = poseResults.landmarks[endIdx]
+      
+      if (startLandmark && endLandmark && 
+          startLandmark.confidence > 0.3 && endLandmark.confidence > 0.3) {
+        
+        // Transform coordinates
+        const startX = canvas.width - ((startLandmark.x * scale) + offsetX)
+        const startY = (startLandmark.y * scale) + offsetY
+        const endX = canvas.width - ((endLandmark.x * scale) + offsetX)
+        const endY = (endLandmark.y * scale) + offsetY
 
-        // Draw keypoint
+        // Draw line
         ctx.beginPath()
-        ctx.arc(x, y, 4, 0, 2 * Math.PI)
-        ctx.fill()
-
-        // Draw keypoint index and confidence
-        ctx.fillStyle = '#ffffff'
-        ctx.font = '10px Arial'
-        ctx.fillText(`${index}:${(landmark.confidence * 100).toFixed(0)}%`, x + 8, y - 8)
-        ctx.fillStyle = '#00ff00'
+        ctx.moveTo(startX, startY)
+        ctx.lineTo(endX, endY)
+        ctx.stroke()
       }
     })
 
-    Logger.debug('Drew pose landmarks', {
-      keypoints: poseResults.landmarks.length,
-      scale,
-      offsetX,
-      offsetY
+    // Draw keypoints with stability indicators
+    poseResults.landmarks.forEach((landmark, index) => {
+      if (landmark.confidence > 0.3) {
+        // Transform coordinates
+        const x = canvas.width - ((landmark.x * scale) + offsetX)
+        const y = (landmark.y * scale) + offsetY
+
+        // Get stability info for this landmark
+        const landmarkStability = poseStability.landmarkStabilities.find(ls => ls.keypointIndex === index)
+        const isStable = landmarkStability?.isStable || false
+        const velocity = landmarkStability?.velocity.magnitude || 0
+
+        // Choose color based on stability
+        let fillColor = '#00ff00' // Default green
+        let strokeColor = '#ffffff'
+        
+        if (isStable) {
+          fillColor = '#00ff00' // Green for stable
+          strokeColor = '#00aa00'
+        } else if (velocity > 5) {
+          fillColor = '#ff0000' // Red for high velocity
+          strokeColor = '#aa0000'
+        } else if (velocity > 2) {
+          fillColor = '#ffaa00' // Orange for medium velocity
+          strokeColor = '#aa6600'
+        }
+
+        // Draw keypoint with stability indicator
+        ctx.fillStyle = fillColor
+        ctx.strokeStyle = strokeColor
+        ctx.lineWidth = 2
+        
+        // Draw outer circle for stability
+        ctx.beginPath()
+        ctx.arc(x, y, isStable ? 6 : 4, 0, 2 * Math.PI)
+        ctx.fill()
+        ctx.stroke()
+
+        // Draw inner circle
+        ctx.fillStyle = '#ffffff'
+        ctx.beginPath()
+        ctx.arc(x, y, 2, 0, 2 * Math.PI)
+        ctx.fill()
+
+        // Removed text labels for cleaner display
+      }
     })
-  }, [poseResults])
+
+    // Draw stability status overlay
+    if (poseStability.totalLandmarksCount > 0) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
+      ctx.fillRect(10, 10, 200, 100)
+      
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '14px Arial'
+      ctx.fillText(`Stability: ${Math.round(stabilityProgress * 100)}%`, 20, 30)
+      ctx.fillText(`Stable: ${stableLandmarksCount}/${totalLandmarksCount}`, 20, 50)
+      ctx.fillText(`Threshold: 70% for 2s`, 20, 70)
+      
+      if (isPoseStable) {
+        ctx.fillStyle = '#00ff00'
+        ctx.fillText('✓ READY FOR MEASUREMENTS', 20, 90)
+      } else if (stabilityProgress > 0.5) {
+        ctx.fillStyle = '#ffff00'
+        ctx.fillText('⏳ ALMOST READY', 20, 90)
+      } else {
+        ctx.fillStyle = '#ff0000'
+        ctx.fillText('⏳ HOLD STILL', 20, 90)
+      }
+    }
+
+    Logger.debug('Enhanced pose landmarks drawn', {
+      keypoints: poseResults.landmarks.length,
+      stableLandmarks: stableLandmarksCount,
+      totalLandmarks: totalLandmarksCount,
+      isStable: isPoseStable
+    })
+  }, [poseResults, poseStability, stableLandmarksCount, totalLandmarksCount, stabilityProgress, isPoseStable])
 
   const forceStartDetection = useCallback(() => {
     Logger.info('Manual detection restart triggered')
@@ -359,14 +479,14 @@ export function MeasurementsStepImpl({
       Logger.warn('Cannot force start: Pose not initialized yet')
       return
     }
-    if (!videoRef.current && !isDemoMode) {
+    if (!videoRef.current) {
       Logger.warn('Cannot force start: No video element')
       return
     }
     try {
       stopDetection()
       Logger.info('Restarting pose detection...')
-      startDetection().then(() => {
+      startDetectionWithRetry().then(() => {
         Logger.info('Pose detection manually restarted successfully')
       }).catch((err: Error) => {
         Logger.error('Manual detection restart failed', { error: err.message })
@@ -374,220 +494,89 @@ export function MeasurementsStepImpl({
     } catch (err) {
       Logger.error('Manual detection restart error', { error: (err as Error).message })
     }
-  }, [isPoseInitialized, stopDetection, startDetection, isDemoMode])
-
-  // Demo mode activation
-  const enableDemoMode = useCallback(() => {
-    Logger.info('Enabling demo mode - camera not available')
-    setIsDemoMode(true)
-    setCameraError('')
-    
-    // Mock successful pose detection after delay
-    setTimeout(async () => {
-      Logger.info('Demo mode: Initializing mock pose detection')
-      
-      // Initialize pose detection in demo mode
-      if (videoRef.current) {
-        await initializePose(videoRef.current)
-        await startDetection()
-      }
-      
-      Logger.info('Demo mode: Ready for measurements')
-    }, 1000)
-  }, [initializePose, startDetection])
+  }, [isPoseInitialized, stopDetection, startDetection, startDetectionWithRetry])
 
   // Enhanced camera initialization
   const startCamera = useCallback(async () => {
-    if (hasBootedRef.current || !videoRef.current) {
-      Logger.warn('startCamera: Already booted or no video element')
-      return
-    }
-
-    Logger.info('Starting camera initialization')
-    hasBootedRef.current = true
-    setCameraError('')
-
+    Logger.info('Starting camera initialization...');
+    setCameraError('');
+    setIsPoseWarmingUp(true);
+    
     try {
-      const video = videoRef.current
-
-      // Check if getUserMedia is available
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera API not supported in this environment')
-      }
-
-      // Enhanced camera constraints with fallbacks
-      const cameraConstraints = [
-        {
-          video: {
-            facingMode: 'user',
-            width: { ideal: 640, min: 320 },
-            height: { ideal: 480, min: 240 },
-            frameRate: { ideal: 30, min: 15 }
-          }
-        },
-        {
-          video: {
-            facingMode: 'user',
-            width: { ideal: 480 },
-            height: { ideal: 360 }
-          }
-        },
-        {
-          video: true
+      // Start camera
+      Logger.info('Requesting camera access...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
         }
-      ]
-
-      let stream: MediaStream | null = null
-      let lastError: Error | null = null
-
-      // Try each constraint set
-      for (const constraints of cameraConstraints) {
-        try {
-          Logger.info('Trying camera constraints:', constraints)
-          stream = await navigator.mediaDevices.getUserMedia(constraints)
-          Logger.info('Camera stream acquired successfully')
-          break
-        } catch (err) {
-          lastError = err as Error
-          Logger.warn(`Camera constraint failed: ${lastError.message}`)
-          continue
-        }
-      }
-
-      if (!stream) {
-        throw lastError || new Error('All camera configurations failed')
-      }
-
-      // Set up video stream
-      video.srcObject = stream
-      Logger.info('Camera stream set on video element')
-
-      // Wait for video to load with timeout and better error handling
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Video loading timeout - video may not be ready'))
-        }, 15000) // Increased timeout
-
-        const onLoadedMetadata = () => {
-          clearTimeout(timeout)
-          video.removeEventListener('loadedmetadata', onLoadedMetadata)
-          video.removeEventListener('error', onError)
-          video.removeEventListener('canplay', onCanPlay)
-          
-          // Additional check for video dimensions
-          if (video.videoWidth === 0 || video.videoHeight === 0) {
-            reject(new Error('Video dimensions not available'))
-            return
-          }
-          
-          Logger.info('Video metadata loaded successfully', {
-            dimensions: `${video.videoWidth}x${video.videoHeight}`,
-            readyState: video.readyState
-          })
-          resolve()
-        }
-
-        const onCanPlay = () => {
-          Logger.info('Video can start playing')
-        }
-
-        const onError = (event: Event) => {
-          clearTimeout(timeout)
-          video.removeEventListener('loadedmetadata', onLoadedMetadata)
-          video.removeEventListener('error', onError)
-          video.removeEventListener('canplay', onCanPlay)
-          
-          const error = event as ErrorEvent
-          Logger.error('Video load error', { error: error.message || 'Unknown video error' })
-          reject(new Error('Video load error: ' + (error.message || 'Unknown error')))
-        }
-
-        video.addEventListener('loadedmetadata', onLoadedMetadata)
-        video.addEventListener('canplay', onCanPlay)
-        video.addEventListener('error', onError)
-        
-        // Force load if not already loading
-        if (video.readyState < 1) {
-          video.load()
-        }
-      })
-
-      // Try to play video with retry logic
-      let playAttempts = 0
-      const maxPlayAttempts = 3
+      });
       
-      while (playAttempts < maxPlayAttempts) {
-        try {
-          await video.play()
-          Logger.info('Video playing successfully')
-          break
-        } catch (playError) {
-          playAttempts++
-          Logger.warn(`Video play attempt ${playAttempts} failed:`, playError)
-          
-          if (playAttempts >= maxPlayAttempts) {
-            throw new Error(`Failed to play video after ${maxPlayAttempts} attempts`)
-          }
-          
-          // Wait a bit before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000))
-        }
-      }
-
-      syncCanvasToVideo()
-
-      // Initialize pose detection with better error handling
-      try {
-        await initializePose(video)
-        Logger.info('Pose detection model initialized')
-
-        await startDetection()
-        Logger.info('Pose detection started successfully')
-      } catch (poseError) {
-        const poseErrorMessage = (poseError as Error).message
-        Logger.warn('Pose detection failed, but camera is working', { 
-          error: poseErrorMessage,
-          stack: (poseError as Error).stack
-        })
-
-        // Don't fail completely if pose detection fails - camera is still working
-        // Just show a warning and continue with basic camera functionality
-        setCameraError(`Camera working but pose detection failed: ${poseErrorMessage}. You can still use manual measurements.`)
+      if (videoRef.current) {
+        Logger.info('Setting video stream...');
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
         
-        // Don't enable demo mode immediately - let user see the camera feed
-        // They can manually enable demo mode if needed
-        return
+        // Wait for video to be ready
+        await new Promise<void>((resolve) => {
+          if (videoRef.current) {
+            videoRef.current.onloadedmetadata = () => {
+              Logger.info('Video metadata loaded');
+              resolve();
+            };
+          }
+        });
+        
+        Logger.info('Camera started successfully');
+        setCameraStarted(true);
+        
+        // Add a delay before initializing pose detection to ensure video is fully ready
+        Logger.info('Waiting for video to stabilize...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Initialize pose detection with proper loading phase
+        Logger.info('Initializing pose detection...');
+        setCameraError('Initializing pose detection model...');
+        await initializePose(videoRef.current);
+        
+        // Add another delay before starting detection to ensure model is fully ready
+        Logger.info('Waiting for model to stabilize...');
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced from 2000ms
+        
+        Logger.info('Starting pose detection...');
+        setCameraError('Starting pose detection...');
+        await startDetectionWithRetry();
+        
+        Logger.info('Pose detection started successfully');
+        setIsPoseWarmingUp(false);
+        setCameraError('');
+      } else {
+        throw new Error('Video element not available');
       }
-
     } catch (error) {
-      const errorMessage = (error as Error).message
-      Logger.error('Camera initialization failed', { 
-        error: errorMessage,
-        stack: (error as Error).stack
-      })
-
-      // Set user-friendly error messages
-      let userFriendlyMessage = errorMessage
+      Logger.error('Camera initialization failed:', error);
       
-      if (errorMessage.includes('Permission denied') || errorMessage.includes('NotAllowedError')) {
-        userFriendlyMessage = 'Camera access denied. Please allow camera permissions and try again.'
-      } else if (errorMessage.includes('NotFoundError') || errorMessage.includes('DevicesNotFoundError')) {
-        userFriendlyMessage = 'No camera found. Please ensure your device has a camera and try again.'
-      } else if (errorMessage.includes('NotReadableError') || errorMessage.includes('TrackStartError')) {
-        userFriendlyMessage = 'Camera is busy or unavailable. Please close other apps using the camera and try again.'
-      } else if (errorMessage.includes('aborted') || errorMessage.includes('AbortError')) {
-        userFriendlyMessage = 'Camera access was interrupted. Please try again.'
-      } else if (errorMessage.includes('NotSupportedError') || errorMessage.includes('not supported')) {
-        userFriendlyMessage = 'Camera not supported in this environment. Please use a different browser or device.'
+      // Provide more specific error messages based on the error type
+      let errorMessage = 'Camera failed to start';
+      if (error instanceof Error) {
+        if (error.message.includes('Permission denied') || error.message.includes('NotAllowedError')) {
+          errorMessage = 'Camera access denied. Please allow camera permissions and try again.';
+        } else if (error.message.includes('NotFoundError') || error.message.includes('DevicesNotFoundError')) {
+          errorMessage = 'No camera found. Please check your device has a camera and try again.';
+        } else if (error.message.includes('NotReadableError') || error.message.includes('TrackStartError')) {
+          errorMessage = 'Camera is in use by another application. Please close other camera apps and try again.';
+        } else if (error.message.includes('Pose detection failed')) {
+          errorMessage = `Pose detection failed: ${error.message}`;
+        } else {
+          errorMessage = `Camera error: ${error.message}`;
+        }
       }
-
-      setCameraError(userFriendlyMessage)
-      hasBootedRef.current = false
       
-      // Enable demo mode for testing
-      enableDemoMode()
+      setCameraError(errorMessage);
+      setIsPoseWarmingUp(false);
     }
-  }, [syncCanvasToVideo, initializePose, startDetection, enableDemoMode])
+  }, [initializePose, startDetectionWithRetry]);
 
   const stopCamera = useCallback(() => {
     Logger.info('Stopping camera')
@@ -600,16 +589,27 @@ export function MeasurementsStepImpl({
     stopDetection()
   }, [stopDetection])
 
+  // Enhanced measurement taking with stability check
   const handleTakeMeasurement = () => {
-    Logger.info('Taking measurement', {
-      poseDetected: poseResults?.isDetected,
-      confidence: poseResults?.confidence,
-      demoMode: isDemoMode
+    if (!isPoseStable) {
+      setValidationMessage('Please hold still until the pose is stable before taking measurements.')
+      return
+    }
+
+    if (!validation.isValid) {
+      setValidationMessage('Please meet all pose requirements before taking measurements.')
+      return
+    }
+
+    Logger.info('Taking measurements with stable pose', {
+      isStable: isPoseStable,
+      stableLandmarks: stableLandmarksCount,
+      validation: validation
     })
     setIsProcessing(true)
     
     setTimeout(() => {
-      const mockMeasurements: Measurements = {
+      const mockMeasurements: MeasurementsType = {
         chest: 42, 
         waist: 32, 
         hips: 38, 
@@ -622,19 +622,61 @@ export function MeasurementsStepImpl({
       Logger.info('Measurements calculated', { measurements: mockMeasurements })
       setMeasurements(mockMeasurements)
       setIsProcessing(false)
-      if (!isDemoMode) {
-        stopCamera()
-      }
+      stopCamera()
     }, 2000)
   }
+
+  // Auto-skip to recommendations when countdown reaches 0
+  useEffect(() => {
+    if (autoSkipCountdown === 0 && isPoseStable && validation.isValid && !measurements && !isProcessing) {
+      Logger.info('Auto-skipping to recommendations - countdown complete', {
+        stabilityProgress,
+        validation: validation.isValid
+      })
+      
+      // Generate mock measurements and proceed directly to recommendations
+      const mockMeasurements: MeasurementsType = {
+        chest: 42, 
+        waist: 32, 
+        hips: 38, 
+        shoulders: 18,
+        armLength: 25, 
+        inseam: 32, 
+        height: 70, 
+        weight: 165
+      }
+      
+      // Call the completion handler directly to skip measurements display
+      onMeasurementsComplete(mockMeasurements)
+    }
+  }, [autoSkipCountdown, isPoseStable, validation.isValid, measurements, isProcessing, onMeasurementsComplete])
+
+  // Countdown effect when pose is stable
+  useEffect(() => {
+    if (isPoseStable && validation.isValid && !measurements && !isProcessing) {
+      // Start 3-second countdown before auto-skip
+      setAutoSkipCountdown(3)
+      const interval = setInterval(() => {
+        setAutoSkipCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(interval)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+      
+      return () => clearInterval(interval)
+    } else {
+      setAutoSkipCountdown(0)
+    }
+  }, [isPoseStable, validation.isValid, measurements, isProcessing])
 
   const handleRetake = () => {
     Logger.info('User requested measurement retake')
     setMeasurements(null)
     setIsProcessing(false)
-    if (!isDemoMode) {
-      startCamera()
-    }
+    startCamera()
   }
 
   const handleContinue = () => {
@@ -648,15 +690,34 @@ export function MeasurementsStepImpl({
 
   const retryCamera = () => {
     Logger.info('User requested camera retry')
-    hasBootedRef.current = false
-    setIsDemoMode(false)
     setCameraError('')
-    startCamera()
+    
+    // Clean up previous attempt
+    try {
+      stopDetection()
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream
+        stream.getTracks().forEach(track => track.stop())
+        videoRef.current.srcObject = null
+      }
+      setCameraStarted(false)
+      setIsPoseWarmingUp(false)
+    } catch (err) {
+      Logger.warn('Error during cleanup before retry:', err)
+    }
+    
+    // Wait a moment before retrying to ensure cleanup is complete
+    setTimeout(() => {
+      startCamera()
+    }, 500)
   }
 
   const debugCameraStatus = () => {
     const video = videoRef.current;
     const stream = video?.srcObject as MediaStream;
+    
+    // Get pose detection health status
+    const poseHealth = getHealthStatus();
     
     console.log('Camera Debug:', {
       hasVideo: !!video,
@@ -668,19 +729,55 @@ export function MeasurementsStepImpl({
         readyState: track.readyState
       })),
       videoPlaying: !video?.paused,
-      videoDimensions: `${video?.videoWidth}x${video?.videoHeight}`
+      videoDimensions: `${video?.videoWidth}x${video?.videoHeight}`,
+      videoReadyState: video?.readyState,
+      poseDetection: poseHealth
     });
+    
+    // Also log to the UI for debugging
+    const debugInfo = `
+Camera: ${video ? 'Available' : 'Not Available'}
+Stream: ${stream?.active ? 'Active' : 'Inactive'}
+Video Ready: ${video?.readyState !== undefined && video.readyState >= 2 ? 'Yes' : 'No'}
+Dimensions: ${video?.videoWidth}x${video?.videoHeight}
+Pose Model: ${poseHealth.modelLoaded ? 'Loaded' : 'Not Loaded'}
+Detection: ${poseHealth.detectionRunning ? 'Running' : 'Stopped'}
+Errors: ${poseHealth.consecutiveErrors}
+    `.trim();
+    
+    console.log('Debug Info:', debugInfo);
   };
 
 
 
 
-  // Start camera automatically on mount
+  // Start camera automatically on mount with initial countdown
   useEffect(() => {
-    Logger.info('Component mounted, starting camera')
-    startCamera()
+    Logger.info('Component mounted, starting initial countdown')
+    
+    // Start 5-second countdown before camera initialization
+    const countdownInterval = setInterval(() => {
+      setInitialCountdown(prev => {
+        Logger.info(`Countdown: ${prev} -> ${prev - 1}`)
+        if (prev <= 1) {
+          clearInterval(countdownInterval)
+          setIsInitialCountdownActive(false)
+          Logger.info('Initial countdown complete, starting camera')
+          
+          // Add a delay to ensure DOM has been updated and video element is rendered
+          setTimeout(() => {
+            Logger.info('Calling startCamera after delay')
+            startCamera()
+          }, 300)
+          
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
 
     return () => {
+      clearInterval(countdownInterval)
       Logger.info('Component unmounting, cleaning up camera and pose detection')
       try {
         stopDetection()
@@ -692,7 +789,6 @@ export function MeasurementsStepImpl({
         videoRef.current.srcObject = null
       }
       cleanup()
-      hasBootedRef.current = false
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -733,6 +829,8 @@ export function MeasurementsStepImpl({
     }
   }, [poseError])
 
+
+
   return (
     <div className="min-h-screen flex flex-col bg-black">
       {/* Header */}
@@ -749,40 +847,54 @@ export function MeasurementsStepImpl({
           </div>
           <h1 className="text-xl font-bold text-gray-900">Get Your Measurements</h1>
           <p className="text-sm text-gray-500">
-            {isDemoMode ? 'Demo Mode - Simulated measurements' : "We'll use your camera to measure you perfectly"}
+            We'll use your camera to measure you perfectly
           </p>
         </div>
       </header>
 
-      {/* Main content area */}
-      <main className="relative flex-1 overflow-hidden">
-        {/* Confidence Threshold Component - Top UI */}
-        <ConfidenceThreshold
-          validation={validation}
-          requirements={[]}
-          isVisible={Boolean(!isDemoMode && !measurements && !isProcessing && selectedStyleId && poseResults?.isDetected)}
-        />
-
-        {isDemoMode ? (
-          // Demo mode UI
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <div className="text-white text-center p-8">
-              <div className="w-32 h-32 mx-auto mb-6 border-4 border-white rounded-full flex items-center justify-center">
-                <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold mb-2">Demo Mode</h2>
-              <p className="text-blue-100 mb-4">Camera not available - using simulated measurements</p>
-              <div className="bg-white/20 rounded-lg p-4 backdrop-blur">
-                <p className="text-sm">
-                  {isPoseInitialized ? '✅ Ready to take measurements' : '⏳ Initializing...'}
-                </p>
-              </div>
+      {/* Initial Countdown Overlay */}
+      {isInitialCountdownActive && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/90">
+          <div className="text-center text-white">
+            <div className="mb-8">
+              <div className="text-8xl font-bold text-blue-500 mb-4">{initialCountdown}</div>
+              <h2 className="text-2xl font-bold mb-4">Get Ready for Measurements</h2>
+              <p className="text-lg text-gray-300 max-w-md mx-auto leading-relaxed">
+                We will begin taking measurements. Place the camera in a position to view your measurements.
+              </p>
+            </div>
+            <div className="flex items-center justify-center space-x-2">
+              <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+              <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
             </div>
           </div>
-        ) : (
-          // Normal camera UI
+        </div>
+      )}
+
+      {/* Main content area */}
+      <main className="relative flex-1 overflow-hidden">
+        {/* Debug info */}
+        {!isInitialCountdownActive && (
+          <div className="absolute top-4 right-4 z-50 bg-black/80 text-white text-xs p-2 rounded">
+            <div>Countdown: {isInitialCountdownActive ? 'Active' : 'Complete'}</div>
+            <div>Camera: {cameraStarted ? 'Started' : 'Not Started'}</div>
+            <div>Error: {cameraError || 'None'}</div>
+          </div>
+        )}
+
+        {/* Confidence Threshold Component - Top UI */}
+        {!isInitialCountdownActive && (
+          <ConfidenceThreshold
+            validation={validation}
+            requirements={[]}
+            stabilityProgress={stabilityProgress}
+            isVisible={Boolean(!measurements && !isProcessing && selectedStyleId && poseResults?.isDetected)}
+          />
+        )}
+
+        {/* Camera UI - Show when countdown is complete */}
+        {!isInitialCountdownActive && (
           <>
             <video
               ref={videoRef}
@@ -798,13 +910,50 @@ export function MeasurementsStepImpl({
               className="absolute inset-0 pointer-events-none transform z-50"
               style={{ zIndex: 10, transformOrigin: 'center' }}
             />
+
+            {/* Camera Loading Overlay */}
+            {!cameraStarted && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
+                <div className="bg-white rounded-lg p-6 max-w-sm mx-4 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {isPoseWarmingUp ? 'Warming Up Pose Detection...' : 'Starting Camera...'}
+                  </h3>
+                  <p className="text-gray-600 text-sm mb-4">
+                    {isPoseWarmingUp 
+                      ? 'Initializing the AI model for pose detection. This may take a few seconds.'
+                      : 'Setting up camera access and video stream...'
+                    }
+                  </p>
+                  {cameraError && (
+                    <div className="bg-blue-600/20 border border-blue-600/30 rounded-md p-3 mb-4">
+                      <p className="text-blue-800 text-sm">{cameraError}</p>
+                    </div>
+                  )}
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={startCamera}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      Retry
+                    </button>
+                    <button
+                      onClick={debugCameraStatus}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                    >
+                      Debug
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
 
 
 
         {/* Camera error UI */}
-        {cameraError && !isDemoMode && (
+        {!isInitialCountdownActive && cameraError && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 p-4">
             <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm text-center">
               <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
@@ -822,10 +971,10 @@ export function MeasurementsStepImpl({
                   Try Again
                 </button>
                 <button
-                  onClick={enableDemoMode}
-                  className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200"
+                  onClick={debugCameraStatus}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700"
                 >
-                  Demo Mode
+                  Debug
                 </button>
               </div>
             </div>
@@ -833,7 +982,7 @@ export function MeasurementsStepImpl({
         )}
 
         {/* Clothing Instructions */}
-        {!isDemoMode && !measurements && !isProcessing && selectedStyleId && (
+        {!isInitialCountdownActive && !measurements && !isProcessing && selectedStyleId && (
           <div className="absolute bottom-20 left-0 right-0 z-20 px-4">
             <div className="bg-black/60 backdrop-blur-sm text-white text-center py-3 px-4 rounded-lg">
               <p className="text-sm font-medium">
@@ -843,29 +992,59 @@ export function MeasurementsStepImpl({
           </div>
         )}
 
+        {/* Auto-skip countdown overlay */}
+        {!isInitialCountdownActive && autoSkipCountdown > 0 && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30">
+            <div className="bg-green-600 text-white rounded-full w-24 h-24 flex items-center justify-center text-2xl font-bold">
+              {autoSkipCountdown}
+            </div>
+            <div className="mt-4 text-center">
+              <p className="text-white text-lg font-medium bg-black/60 px-4 py-2 rounded-lg">
+                Auto-skipping in {autoSkipCountdown} second{autoSkipCountdown !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Bottom controls */}
-        {!measurements && !isProcessing && (
+        {!isInitialCountdownActive && !measurements && !isProcessing && (
           <div className="absolute bottom-4 left-0 right-0 z-20 px-4">
             <div className="flex gap-3">
               <button
-                onClick={isDemoMode ? enableDemoMode : stopCamera}
+                onClick={stopCamera}
                 className="flex-1 bg-white/80 text-gray-900 backdrop-blur px-4 py-3 rounded-lg font-medium hover:bg-white"
               >
                 Cancel
               </button>
               <button
                 onClick={handleTakeMeasurement}
-                disabled={!isDemoMode && (!poseResults?.isDetected || !canTakeMeasurement)}
+                disabled={!poseResults?.isDetected || !canTakeMeasurement}
                 className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
               >
-                {isDemoMode ? 'Take Measurement' : 'Waiting for Stable Pose...'}
+                {isPoseStable ? 'Take Measurement' : 
+                  `Hold Still... ${Math.round(stabilityProgress * 100)}%`}
               </button>
             </div>
+            
+            {/* Manual override when pose is stable */}
+            {isPoseStable && validation.isValid && (
+              <div className="mt-3 text-center">
+                <button
+                  onClick={() => {
+                    setAutoSkipCountdown(0)
+                    handleTakeMeasurement()
+                  }}
+                  className="text-white/80 text-sm hover:text-white underline"
+                >
+                  Take measurements manually instead of auto-skip
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {/* Processing overlay */}
-        {isProcessing && (
+        {!isInitialCountdownActive && isProcessing && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60">
             <div className="bg-white rounded-lg shadow p-6 text-center">
               <div className="w-16 h-16 mx-auto mb-4">
@@ -873,14 +1052,14 @@ export function MeasurementsStepImpl({
               </div>
               <h2 className="text-lg font-semibold text-gray-900 mb-1">Processing Measurements</h2>
               <p className="text-sm text-gray-600">
-                {isDemoMode ? 'Generating demo measurements...' : 'Analyzing your pose and calculating measurements...'}
+                Analyzing your pose and calculating measurements...
               </p>
             </div>
           </div>
         )}
 
         {/* Results overlay */}
-        {measurements && (
+        {!isInitialCountdownActive && measurements && (
           <div className="absolute inset-0 z-30 flex items-end p-4">
             <div className="w-full bg-white rounded-xl shadow p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Measurements</h2>
@@ -932,11 +1111,18 @@ export function MeasurementsStepImpl({
           poseResults: poseResults
         }}
         cameraStatus={{
-          isActive: !isDemoMode && !cameraError,
+          isActive: !cameraError,
           error: cameraError,
           stream: videoRef.current?.srcObject as MediaStream
         }}
         videoElement={videoRef.current}
+        poseStability={{
+          isStable: isPoseStable,
+          stableLandmarksCount,
+          totalLandmarksCount,
+          stabilityProgress,
+          message: stabilityMessage
+        }}
       />
     </div>
   )
