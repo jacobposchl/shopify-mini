@@ -52,26 +52,26 @@ export const styles = [
 // Substyles only for the 4 visible style categories (no dresses/activewear to avoid unreachable options)
 export const subStyles: SubStyle[] = [
   // Shirts
-  { id: 'crew-neck',   name: 'Crew Neck',   styleId: 'shirts' },
-  { id: 'v-neck',      name: 'V-Neck',      styleId: 'shirts' },
-  { id: 'button-down', name: 'Button Down', styleId: 'shirts' },
-  { id: 'polo',        name: 'Polo',        styleId: 'shirts' },
+  { id: 'crew-neck',   name: 'Crew Neck',   styleId: 'shirts', description: 'Classic round neck t-shirt' },
+  { id: 'v-neck',      name: 'V-Neck',      styleId: 'shirts', description: 'V-shaped neckline t-shirt' },
+  { id: 'button-down', name: 'Button Down', styleId: 'shirts', description: 'Button-up collared shirt' },
+  { id: 'polo',        name: 'Polo',        styleId: 'shirts', description: 'Collared polo shirt' },
 
   // Pants
-  { id: 'jeans',       name: 'Jeans',       styleId: 'pants' },
-  { id: 'joggers',     name: 'Joggers',     styleId: 'pants' },
-  { id: 'dress-pants', name: 'Dress Pants', styleId: 'pants' },
-  { id: 'leggings',    name: 'Leggings',    styleId: 'pants' },
+  { id: 'jeans',       name: 'Jeans',       styleId: 'pants', description: 'Denim jeans' },
+  { id: 'joggers',     name: 'Joggers',     styleId: 'pants', description: 'Athletic jogger pants' },
+  { id: 'dress-pants', name: 'Dress Pants', styleId: 'pants', description: 'Formal dress pants' },
+  { id: 'leggings',    name: 'Leggings',    styleId: 'pants', description: 'Fitted athletic leggings' },
 
   // Shorts
-  { id: 'athletic-shorts', name: 'Athletic Shorts', styleId: 'shorts' },
-  { id: 'casual-shorts',   name: 'Casual Shorts',   styleId: 'shorts' },
-  { id: 'dress-shorts',    name: 'Dress Shorts',    styleId: 'shorts' },
+  { id: 'athletic-shorts', name: 'Athletic Shorts', styleId: 'shorts', description: 'Sports athletic shorts' },
+  { id: 'casual-shorts',   name: 'Casual Shorts',   styleId: 'shorts', description: 'Casual everyday shorts' },
+  { id: 'dress-shorts',    name: 'Dress Shorts',    styleId: 'shorts', description: 'Formal dress shorts' },
 
   // Jackets
-  { id: 'hoodie',      name: 'Hoodie',      styleId: 'jackets' },
-  { id: 'blazer',      name: 'Blazer',      styleId: 'jackets' },
-  { id: 'windbreaker', name: 'Windbreaker', styleId: 'jackets' },
+  { id: 'hoodie',      name: 'Hoodie',      styleId: 'jackets', description: 'Hooded sweatshirt' },
+  { id: 'blazer',      name: 'Blazer',      styleId: 'jackets', description: 'Formal blazer jacket' },
+  { id: 'windbreaker', name: 'Windbreaker', styleId: 'jackets', description: 'Lightweight windbreaker jacket' },
 ]
 
 // Helper for consistent dummy data

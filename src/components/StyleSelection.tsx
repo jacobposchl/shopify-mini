@@ -1,4 +1,4 @@
-import React from 'react'
+
 import type { Style } from '../types'
 import { styles } from '../data/mockData'
 
