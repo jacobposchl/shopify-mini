@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+// src/components/Measurements.tsx
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Measurements, MeasurementValidation } from '../types'
 import { usePoseDetectionTF } from '../hooks/usePoseDetectionTF'
 import { usePoseValidation } from '../hooks/usePoseValidation'
@@ -6,58 +7,61 @@ import { Logger } from '../utils/Logger'
 
 import { ConfidenceThreshold } from './ConfidenceThreshold'
 import { getClothingInstructions } from '../data/poseRequirements'
-import React from 'react'
 
 // Error boundary component
 class InAppErrorBoundary extends React.Component<
-  {children: React.ReactNode}, 
-  {err?: Error, stack?: string, open: boolean}
+  { children: React.ReactNode },
+  { err?: Error; stack?: string; open: boolean }
 > {
-  constructor(props: {children: React.ReactNode}) {
+  constructor(props: { children: React.ReactNode }) {
     super(props)
     this.state = { err: undefined, stack: '', open: false }
   }
-  
+
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     Logger.error('React Error Boundary caught error', {
       error: error.message,
       stack: error.stack,
-      componentStack: info.componentStack
+      componentStack: info.componentStack,
     })
-    this.setState({ 
-      err: error, 
-      stack: info?.componentStack ?? '', 
-      open: true 
+    this.setState({
+      err: error,
+      stack: info?.componentStack ?? '',
+      open: true,
     })
   }
-  
+
   render() {
     if (!this.state.open) return this.props.children
-    
+
     const message = this.state.err?.message ?? 'Unknown error'
-    
+
     return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.9)',
-        color: '#fff',
-        zIndex: 99999,
-        padding: 20,
-        fontSize: 14,
-        fontFamily: 'monospace'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 16
-        }}>
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.9)',
+          color: '#fff',
+          zIndex: 99999,
+          padding: 20,
+          fontSize: 14,
+          fontFamily: 'monospace',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+          }}
+        >
           <strong>⚠️ React Error</strong>
-          <button 
+          <button
             onClick={() => this.setState({ open: false })}
             style={{
               background: '#333',
@@ -65,7 +69,7 @@ class InAppErrorBoundary extends React.Component<
               border: 'none',
               padding: '8px 12px',
               borderRadius: 6,
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             Dismiss
@@ -74,15 +78,17 @@ class InAppErrorBoundary extends React.Component<
         <div style={{ marginBottom: 12 }}>
           <strong>Error:</strong> {message}
         </div>
-        <pre style={{
-          whiteSpace: 'pre-wrap',
-          margin: 0,
-          fontSize: 12,
-          background: '#222',
-          padding: 12,
-          borderRadius: 6,
-          overflow: 'auto'
-        }}>
+        <pre
+          style={{
+            whiteSpace: 'pre-wrap',
+            margin: 0,
+            fontSize: 12,
+            background: '#222',
+            padding: 12,
+            borderRadius: 6,
+            overflow: 'auto',
+          }}
+        >
           {this.state.stack}
         </pre>
       </div>
@@ -93,60 +99,64 @@ class InAppErrorBoundary extends React.Component<
 // Global error hooks component
 function GlobalErrorHooks() {
   const [msg, setMsg] = useState<string | null>(null)
-  
+
   useEffect(() => {
     const onErr = (e: ErrorEvent) => {
       const errorMsg = `${e.message}\n${e.error?.stack ?? ''}`
-      Logger.error('Global window error', { 
-        message: e.message, 
+      Logger.error('Global window error', {
+        message: e.message,
         stack: e?.error?.stack,
         filename: e.filename,
         lineno: e.lineno,
-        colno: e.colno
+        colno: e.colno,
       })
       setMsg(errorMsg)
     }
-    
+
     const onRej = (e: PromiseRejectionEvent) => {
       const errorMsg = `unhandledrejection: ${e.reason?.message ?? e.reason}\n${e.reason?.stack ?? ''}`
       Logger.error('Unhandled promise rejection', {
         reason: e.reason?.message ?? e.reason,
-        stack: e.reason?.stack
+        stack: e.reason?.stack,
       })
       setMsg(errorMsg)
     }
-    
+
     window.addEventListener('error', onErr)
     window.addEventListener('unhandledrejection', onRej)
-    
+
     return () => {
       window.removeEventListener('error', onErr)
       window.removeEventListener('unhandledrejection', onRej)
     }
   }, [])
-  
+
   if (!msg) return null
-  
+
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: 12,
-      left: 12,
-      right: 12,
-      background: 'rgba(0,0,0,0.85)',
-      color: '#fff',
-      zIndex: 99998,
-      padding: 12,
-      borderRadius: 12
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 6
-      }}>
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 12,
+        left: 12,
+        right: 12,
+        background: 'rgba(0,0,0,0.85)',
+        color: '#fff',
+        zIndex: 99998,
+        padding: 12,
+        borderRadius: 12,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 6,
+        }}
+      >
         <strong>⚠️ Runtime Error</strong>
-        <button 
+        <button
           onClick={() => setMsg(null)}
           style={{
             background: '#333',
@@ -154,17 +164,19 @@ function GlobalErrorHooks() {
             border: 'none',
             padding: '4px 8px',
             borderRadius: 6,
-            cursor: 'pointer'
+            cursor: 'pointer',
           }}
         >
           Dismiss
         </button>
       </div>
-      <pre style={{
-        whiteSpace: 'pre-wrap',
-        margin: 0,
-        fontSize: 12
-      }}>
+      <pre
+        style={{
+          whiteSpace: 'pre-wrap',
+          margin: 0,
+          fontSize: 12,
+        }}
+      >
         {msg}
       </pre>
     </div>
@@ -190,105 +202,81 @@ export function MeasurementsStepImpl({
   selectedCompanyName,
   selectedStyleName,
   selectedSubStyleName,
-  selectedStyleId
+  selectedStyleId,
 }: MeasurementsStepProps) {
-
-  // Add the calculateDistance function HERE - right after the component starts
+  // --- helpers to compute distances/measurements ---
   const calculateDistance = (landmark1: any, landmark2: any, scale: number) => {
-    // Calculate pixel distance
     const pixelDistance = Math.sqrt(
-      Math.pow((landmark2.x - landmark1.x) * scale, 2) + 
-      Math.pow((landmark2.y - landmark1.y) * scale, 2)
-    );
-    
-    // Convert pixels to inches (you'll need to calibrate this ratio)
-    const calibrationFactor = 22.5 / 2.0; // = 11.25
-    const distanceInInches = (pixelDistance / 50) * calibrationFactor;
-    
-    return distanceInInches.toFixed(1);
-  };
+      Math.pow((landmark2.x - landmark1.x) * scale, 2) + Math.pow((landmark2.y - landmark1.y) * scale, 2),
+    )
+    const calibrationFactor = 22.5 / 2.0 // rough, demo-only
+    const distanceInInches = (pixelDistance / 50) * calibrationFactor
+    return distanceInInches.toFixed(1)
+  }
 
-  // Calculate actual measurements based on clothing type and pose landmarks
   const calculateRealMeasurements = (landmarks: any[], scale: number, clothingType: string) => {
     const measurements: Measurements = {
       chest: 0,
-      waist: 0, 
+      waist: 0,
       hips: 0,
       shoulders: 0,
       armLength: 0,
       inseam: 0,
-      height: 70, // Default
-      weight: 165 // Default
-    };
-
-    // Calculate shoulder width (always relevant)
-    if (landmarks[5] && landmarks[6]) { // leftShoulder, rightShoulder
-      measurements.shoulders = parseFloat(calculateDistance(landmarks[5], landmarks[6], scale));
+      height: 70,
+      weight: 165,
     }
 
-    // Calculate measurements based on clothing type
+    if (landmarks[5] && landmarks[6]) {
+      measurements.shoulders = parseFloat(calculateDistance(landmarks[5], landmarks[6], scale))
+    }
+
     switch (clothingType) {
       case 'shirts':
       case 'jackets':
-        // Chest approximation (shoulder width * 2.3 is typical ratio)
-        measurements.chest = measurements.shoulders * 2.3;
-        
-        // Arm length (shoulder to elbow)
-        if (landmarks[5] && landmarks[7]) { // leftShoulder to leftElbow
-          measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7], scale));
+        measurements.chest = measurements.shoulders * 2.3
+        if (landmarks[5] && landmarks[7]) {
+          measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7], scale))
         }
-        
-        // Waist approximation (slightly smaller than chest)
-        measurements.waist = measurements.chest * 0.85;
-        break;
+        measurements.waist = measurements.chest * 0.85
+        break
 
       case 'pants':
       case 'shorts':
-        // Hip width
-        if (landmarks[11] && landmarks[12]) { // leftHip, rightHip
-          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12], scale));
+        if (landmarks[11] && landmarks[12]) {
+          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12], scale))
         }
-        
-        // Waist approximation (hip width * 2.2)
-        measurements.waist = measurements.hips * 2.2;
-        
-        // Inseam (hip to knee for shorts, hip to ankle for pants)
-        if (clothingType === 'pants' && landmarks[11] && landmarks[15]) { // leftHip to leftAnkle
-          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15], scale));
-        } else if (clothingType === 'shorts' && landmarks[11] && landmarks[13]) { // leftHip to leftKnee
-          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[13], scale));
+        measurements.waist = measurements.hips * 2.2
+        if (clothingType === 'pants' && landmarks[11] && landmarks[15]) {
+          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15], scale))
+        } else if (clothingType === 'shorts' && landmarks[11] && landmarks[13]) {
+          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[13], scale))
         }
-        break;
+        break
 
       case 'activewear':
-        // Full body measurements
-        measurements.chest = measurements.shoulders * 2.3;
-        measurements.waist = measurements.chest * 0.85;
-        
-        if (landmarks[11] && landmarks[12]) { // Hip width
-          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12], scale));
+        measurements.chest = measurements.shoulders * 2.3
+        measurements.waist = measurements.chest * 0.85
+        if (landmarks[11] && landmarks[12]) {
+          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12], scale))
         }
-        
-        if (landmarks[5] && landmarks[7]) { // Arm length
-          measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7], scale));
+        if (landmarks[5] && landmarks[7]) {
+          measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7], scale))
         }
-        
-        if (landmarks[11] && landmarks[15]) { // Inseam
-          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15], scale));
+        if (landmarks[11] && landmarks[15]) {
+          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15], scale))
         }
-        break;
+        break
 
       default:
-        // Default to basic measurements
-        measurements.chest = measurements.shoulders * 2.3;
-        measurements.waist = measurements.chest * 0.85;
-        measurements.hips = measurements.shoulders * 2.1;
+        measurements.chest = measurements.shoulders * 2.3
+        measurements.waist = measurements.chest * 0.85
+        measurements.hips = measurements.shoulders * 2.1
     }
 
-    return measurements;
-  };
+    return measurements
+  }
 
-  // Your existing code continues here (videoRef, canvasRef, etc.)
+  // --- refs & state ---
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const hasBootedRef = useRef(false)
@@ -297,7 +285,7 @@ export function MeasurementsStepImpl({
   const [isProcessing, setIsProcessing] = useState(false)
   const [cameraError, setCameraError] = useState<string>('')
   const [isDemoMode, setIsDemoMode] = useState(false)
-  const [debugEffectCount, setDebugEffectCount] = useState(0);
+  const [debugEffectCount, setDebugEffectCount] = useState(0)
   const [debugAutoTrigger, setDebugAutoTrigger] = useState(false)
   const [debugError, setDebugError] = useState<string>('')
   const [isPoseDetectionWaiting, setIsPoseDetectionWaiting] = useState(false)
@@ -305,8 +293,6 @@ export function MeasurementsStepImpl({
   const [debugBufferSize, setDebugBufferSize] = useState(0)
   const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null)
-  
-
 
   const {
     poseResults,
@@ -318,74 +304,59 @@ export function MeasurementsStepImpl({
     stopDetection,
     cleanup,
     poseStability,
-    setSelectedStyle
+    setSelectedStyle,
   } = usePoseDetectionTF(10)
 
-  // Pose validation hook for confidence thresholds
-  const {
-    validation,
-    resetValidation
-  } = usePoseValidation({
+  // Pose validation hook
+  const { validation, resetValidation } = usePoseValidation({
     poseResults,
     selectedStyleId,
     onValidationComplete: (validation: MeasurementValidation) => {
       Logger.info('Pose validation complete', { validation })
-      // Auto-enable measurement button when validation is complete
-      if (validation.isValid) {
-        setCanTakeMeasurement(true)
-      }
+      if (validation.isValid) setCanTakeMeasurement(true)
     },
-    poseStability
+    poseStability,
   })
 
   // Set selected style for pose stability tracking
   useEffect(() => {
-    if (selectedStyleId) {
-      setSelectedStyle(selectedStyleId)
-    }
+    if (selectedStyleId) setSelectedStyle(selectedStyleId)
   }, [selectedStyleId, setSelectedStyle])
 
-  // Track measurements during validation progression
+  // Track measurements while stabilizing
   useEffect(() => {
-    // Only track measurements when pose is detected, validation is progressing, and we're stable
-    if (poseResults?.isDetected && 
-        validation && 
-        validation.progress > 0 && 
-        validation.progress < 1.0 && 
-        poseStability?.isStable &&
-        selectedStyleId) {
-      
+    if (
+      poseResults?.isDetected &&
+      validation &&
+      validation.progress > 0 &&
+      validation.progress < 1.0 &&
+      poseStability?.isStable &&
+      selectedStyleId
+    ) {
       try {
-        const currentMeasurement = calculateRealMeasurements(
-          poseResults.landmarks, 
-          parseFloat(canvasRef.current?.dataset.videoScale || '1'), 
-          selectedStyleId
-        );
-        
-        // Add to buffer (limit buffer size to prevent memory issues)
-        setMeasurementBuffer(prev => {
-          const newBuffer = [...prev, currentMeasurement];
-          // Keep only last 100 measurements (about 10 seconds at 10fps)
-          const limitedBuffer = newBuffer.slice(-100);
-          setDebugBufferSize(limitedBuffer.length);
-          return limitedBuffer;
-        });
-        
-      } catch (error) {
-        setDebugError(`Measurement tracking error: ${(error as Error).message}`);
+        const current = calculateRealMeasurements(
+          poseResults.landmarks,
+          parseFloat(canvasRef.current?.dataset.videoScale || '1'),
+          selectedStyleId,
+        )
+        setMeasurementBuffer((prev) => {
+          const next = [...prev, current].slice(-100)
+          setDebugBufferSize(next.length)
+          return next
+        })
+      } catch (e) {
+        setDebugError(`Measurement tracking error: ${(e as Error).message}`)
       }
     }
-  }, [poseResults, validation?.progress, poseStability?.isStable, selectedStyleId]);
+  }, [poseResults, validation?.progress, poseStability?.isStable, selectedStyleId])
 
-  // Reset measurement buffer when validation resets
   useEffect(() => {
     if (!validation || validation.progress === 0 || !poseStability?.isStable) {
-      setMeasurementBuffer([]);
-      setDebugBufferSize(0);
+      setMeasurementBuffer([])
+      setDebugBufferSize(0)
     }
-  }, [validation?.progress, poseStability?.isStable]);
+  }, [validation?.progress, poseStability?.isStable])
 
-  // Reset validation when pose becomes unstable
   useEffect(() => {
     if (poseStability && !poseStability.isStable) {
       Logger.info('Pose became unstable, resetting validation')
@@ -394,106 +365,98 @@ export function MeasurementsStepImpl({
     }
   }, [poseStability, resetValidation])
 
-  
   const stopCamera = useCallback(() => {
     Logger.info('Stopping camera')
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream
-      stream.getTracks().forEach(track => track.stop())
+      stream.getTracks().forEach((track) => track.stop())
       videoRef.current.srcObject = null
       Logger.debug('Camera stream stopped and cleared')
     }
     stopDetection()
   }, [stopDetection])
 
-  // Auto-progress immediately when validation reaches 100%
+  // Auto-progress when valid
   useEffect(() => {
-    setDebugEffectCount(prev => prev + 1);
-    
+    setDebugEffectCount((prev) => prev + 1)
+
     if (validation && validation.isValid && validation.progress >= 1.0 && !measurements && !debugAutoTrigger) {
-      setDebugAutoTrigger(true);
-      
+      setDebugAutoTrigger(true)
+
       try {
-        // Use averaged measurements from the buffer
-        const realMeasurements = averageMeasurements(measurementBuffer);
-        
-        setMeasurements(realMeasurements);
-        if (!isDemoMode) {
-          stopCamera();
-        }
-        
-        // IMPORTANT: Store measurements in flow state BEFORE progressing
-        onMeasurementsComplete(realMeasurements);
-        
-        // Don't call onAutoProgress() - onMeasurementsComplete already progresses
-        // onAutoProgress();  // Remove this line
+        const averaged = averageMeasurements(measurementBuffer)
+        setMeasurements(averaged)
+        if (!isDemoMode) stopCamera()
+        onMeasurementsComplete(averaged)
       } catch (error) {
-        setDebugError((error as Error).message);
-        // Fallback to mock measurements
-        const fallbackMeasurements = {
-          chest: 42, waist: 32, hips: 38, shoulders: 18,
-          armLength: 25, inseam: 32, height: 70, weight: 165
-        };
-        setMeasurements(fallbackMeasurements);
-        onMeasurementsComplete(fallbackMeasurements);
-        // onAutoProgress(); // Remove this line too
+        setDebugError((error as Error).message)
+        const fallback = {
+          chest: 42,
+          waist: 32,
+          hips: 38,
+          shoulders: 18,
+          armLength: 25,
+          inseam: 32,
+          height: 70,
+          weight: 165,
+        }
+        setMeasurements(fallback)
+        onMeasurementsComplete(fallback)
       }
     }
-    
-    // Reset debug states when validation drops below 100%
-    if (!validation || !validation.isValid || validation.progress < 1.0) {
-      setDebugAutoTrigger(false);
-      setDebugError('');
-    }
-  }, [validation?.isValid, validation?.progress, measurements, debugAutoTrigger, measurementBuffer, isDemoMode, onMeasurementsComplete, stopCamera]);
-  
 
-  // Log component initialization
+    if (!validation || !validation.isValid || validation.progress < 1.0) {
+      setDebugAutoTrigger(false)
+      setDebugError('')
+    }
+  }, [
+    validation?.isValid,
+    validation?.progress,
+    measurements,
+    debugAutoTrigger,
+    measurementBuffer,
+    isDemoMode,
+    onMeasurementsComplete,
+    stopCamera,
+  ])
+
+  // Init log
   useEffect(() => {
     Logger.info('MeasurementsStep component initialized', {
       selectedItem: selectedItemName,
       company: selectedCompanyName,
       style: selectedStyleName,
-      subStyle: selectedSubStyleName
+      subStyle: selectedSubStyleName,
     })
     return undefined
   }, [selectedItemName, selectedCompanyName, selectedStyleName, selectedSubStyleName])
 
-
-
-  // Sync canvas size and position to match video
+  // Canvas sync
   const syncCanvasToVideo = useCallback(() => {
     if (!canvasRef.current || !videoRef.current) return
 
     const canvas = canvasRef.current
     const video = videoRef.current
 
-    // Get the actual video dimensions
     const videoWidth = video.videoWidth
     const videoHeight = video.videoHeight
 
-    // Get the container dimensions
     const containerWidth = video.clientWidth
     const containerHeight = video.clientHeight
 
-    // Calculate the scaling factors for object-contain
     const scaleX = containerWidth / videoWidth
     const scaleY = containerHeight / videoHeight
     const scale = Math.min(scaleX, scaleY)
 
-    // Calculate the actual video display dimensions after object-contain scaling
     const displayWidth = videoWidth * scale
     const displayHeight = videoHeight * scale
 
-    // Calculate the offset to center the video within its container
     const offsetX = (containerWidth - displayWidth) / 2
     const offsetY = (containerHeight - displayHeight) / 2
 
-    // Set canvas size to match the container
     canvas.width = containerWidth
     canvas.height = containerHeight
 
-    // Store the transformation parameters for pose drawing
     canvas.dataset.videoScale = scale.toString()
     canvas.dataset.videoOffsetX = offsetX.toString()
     canvas.dataset.videoOffsetY = offsetY.toString()
@@ -509,51 +472,62 @@ export function MeasurementsStepImpl({
       displayWidth,
       displayHeight,
       offsetX,
-      offsetY
+      offsetY,
     })
   }, [])
 
-  const averageMeasurements = (measurements: Measurements[]): Measurements => {
-    if (measurements.length === 0) {
-      // Fallback to mock measurements
+  const averageMeasurements = (arr: Measurements[]): Measurements => {
+    if (arr.length === 0) {
       return {
-        chest: 42, waist: 32, hips: 38, shoulders: 18,
-        armLength: 25, inseam: 32, height: 70, weight: 165
-      };
+        chest: 42,
+        waist: 32,
+        hips: 38,
+        shoulders: 18,
+        armLength: 25,
+        inseam: 32,
+        height: 70,
+        weight: 165,
+      }
     }
-    
-    const averaged: Measurements = {
-      chest: 0, waist: 0, hips: 0, shoulders: 0,
-      armLength: 0, inseam: 0, height: 0, weight: 0
-    };
-    
-    // Sum all measurements
-    measurements.forEach(measurement => {
-      averaged.chest += measurement.chest;
-      averaged.waist += measurement.waist;
-      averaged.hips += measurement.hips;
-      averaged.shoulders += measurement.shoulders;
-      averaged.armLength += measurement.armLength;
-      averaged.inseam += measurement.inseam;
-      averaged.height += measurement.height;
-      averaged.weight += measurement.weight;
-    });
-    
-    // Calculate averages
-    const count = measurements.length;
-    averaged.chest = Math.round((averaged.chest / count) * 10) / 10; // Round to 1 decimal
-    averaged.waist = Math.round((averaged.waist / count) * 10) / 10;
-    averaged.hips = Math.round((averaged.hips / count) * 10) / 10;
-    averaged.shoulders = Math.round((averaged.shoulders / count) * 10) / 10;
-    averaged.armLength = Math.round((averaged.armLength / count) * 10) / 10;
-    averaged.inseam = Math.round((averaged.inseam / count) * 10) / 10;
-    averaged.height = Math.round((averaged.height / count) * 10) / 10;
-    averaged.weight = Math.round((averaged.weight / count) * 10) / 10;
-    
-    return averaged;
-  };
 
-  // Draw pose landmarks on canvas
+    const sum: Measurements = {
+      chest: 0,
+      waist: 0,
+      hips: 0,
+      shoulders: 0,
+      armLength: 0,
+      inseam: 0,
+      height: 0,
+      weight: 0,
+    }
+
+    arr.forEach((m) => {
+      sum.chest += m.chest
+      sum.waist += m.waist
+      sum.hips += m.hips
+      sum.shoulders += m.shoulders
+      sum.armLength += m.armLength
+      sum.inseam += m.inseam
+      sum.height += m.height
+      sum.weight += m.weight
+    })
+
+    const c = arr.length
+    const round1 = (n: number) => Math.round(n * 10) / 10
+
+    return {
+      chest: round1(sum.chest / c),
+      waist: round1(sum.waist / c),
+      hips: round1(sum.hips / c),
+      shoulders: round1(sum.shoulders / c),
+      armLength: round1(sum.armLength / c),
+      inseam: round1(sum.inseam / c),
+      height: round1(sum.height / c),
+      weight: round1(sum.weight / c),
+    }
+  }
+
+  // Draw landmarks
   useEffect(() => {
     if (!canvasRef.current || !poseResults || !poseResults.isDetected) return
 
@@ -561,220 +535,184 @@ export function MeasurementsStepImpl({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Get transformation parameters
     const scale = parseFloat(canvas.dataset.videoScale || '1')
     const offsetX = parseFloat(canvas.dataset.videoOffsetX || '0')
     const offsetY = parseFloat(canvas.dataset.videoOffsetY || '0')
 
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     const drawHumanGuide = () => {
-    ctx.save()
-    
-    const centerX = canvas.width / 2
-    const totalHeight = canvas.height * 0.75
-    const headHeight = totalHeight / 8
-    const startY = canvas.height * 0.15
-    
-    // More visible outline
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'
-    ctx.lineWidth = 3
-    ctx.setLineDash([8, 4])
-    
-    // Head (positioned at top, not overlapping)
-    const headWidth = headHeight * 0.7
-    const headCenterY = startY + headHeight/2
-    ctx.beginPath()
-    ctx.ellipse(centerX, headCenterY, headWidth/2, headHeight/2, 0, 0, 2 * Math.PI)
-    ctx.stroke()
-    
-    // Neck (starts after head ends)
-    const neckStartY = startY + headHeight
-    const neckEndY = neckStartY + headHeight * 0.4
-    ctx.beginPath()
-    ctx.moveTo(centerX, neckStartY)
-    ctx.lineTo(centerX, neckEndY)
-    ctx.stroke()
-    
-    // Shoulders (start after neck ends)
-    const shoulderY = neckEndY + headHeight * 1
-    const shoulderWidth = headHeight * 2.2
-    ctx.beginPath()
-    ctx.arc(centerX, shoulderY, shoulderWidth/2, Math.PI, 0, false)
-    ctx.stroke()
-    
-    // Rest of body starts from shoulder line
-    const waistY = shoulderY + headHeight * 2
-    const hipY = shoulderY + headHeight * 2.8
-    const waistWidth = shoulderWidth * 0.7
-    const hipWidth = shoulderWidth * 0.9
-    
-    // Left side of torso
-    ctx.beginPath()
-    ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
-    ctx.quadraticCurveTo(centerX - waistWidth/2, waistY, centerX - hipWidth/2, hipY)
-    ctx.stroke()
-    
-    // Right side of torso
-    ctx.beginPath()
-    ctx.moveTo(centerX + shoulderWidth/2, shoulderY)
-    ctx.quadraticCurveTo(centerX + waistWidth/2, waistY, centerX + hipWidth/2, hipY)
-    ctx.stroke()
-    
-    // Arms
-    const elbowY = shoulderY + headHeight * 1.5
-    const wristY = shoulderY + headHeight * 2.5
-    const armWidth = headHeight * 0.3
-    
-    // Left arm
-    ctx.beginPath()
-    ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
-    ctx.lineTo(centerX - shoulderWidth/2 - armWidth, elbowY)
-    ctx.lineTo(centerX - shoulderWidth/2 - armWidth * 0.5, wristY)
-    ctx.stroke()
-    
-    // Right arm
-    ctx.beginPath()
-    ctx.moveTo(centerX + shoulderWidth/2, shoulderY)
-    ctx.lineTo(centerX + shoulderWidth/2 + armWidth, elbowY)
-    ctx.lineTo(centerX + shoulderWidth/2 + armWidth * 0.5, wristY)
-    ctx.stroke()
-    
-    // Legs
-    const legWidth = headHeight * 0.4
-    const kneeY = hipY + headHeight * 2
-    const maxAnkleY = startY + totalHeight
-    const ankleY = Math.min(hipY + headHeight * 4, maxAnkleY)
-    
-    // Left leg
-    ctx.beginPath()
-    ctx.moveTo(centerX - hipWidth/4, hipY)
-    ctx.lineTo(centerX - legWidth/2, kneeY)
-    ctx.lineTo(centerX - legWidth/3, ankleY)
-    ctx.stroke()
-    
-    // Right leg
-    ctx.beginPath()
-    ctx.moveTo(centerX + hipWidth/4, hipY)
-    ctx.lineTo(centerX + legWidth/2, kneeY)
-    ctx.lineTo(centerX + legWidth/3, ankleY)
-    ctx.stroke()
-    
-    ctx.restore()
+      ctx.save()
+
+      const centerX = canvas.width / 2
+      const totalHeight = canvas.height * 0.75
+      const headHeight = totalHeight / 8
+      const startY = canvas.height * 0.15
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'
+      ctx.lineWidth = 3
+      ctx.setLineDash([8, 4])
+
+      const headWidth = headHeight * 0.7
+      const headCenterY = startY + headHeight / 2
+      ctx.beginPath()
+      ctx.ellipse(centerX, headCenterY, headWidth / 2, headHeight / 2, 0, 0, 2 * Math.PI)
+      ctx.stroke()
+
+      const neckStartY = startY + headHeight
+      const neckEndY = neckStartY + headHeight * 0.4
+      ctx.beginPath()
+      ctx.moveTo(centerX, neckStartY)
+      ctx.lineTo(centerX, neckEndY)
+      ctx.stroke()
+
+      const shoulderY = neckEndY + headHeight * 1
+      const shoulderWidth = headHeight * 2.2
+      ctx.beginPath()
+      ctx.arc(centerX, shoulderY, shoulderWidth / 2, Math.PI, 0, false)
+      ctx.stroke()
+
+      const waistY = shoulderY + headHeight * 2
+      const hipY = shoulderY + headHeight * 2.8
+      const waistWidth = shoulderWidth * 0.7
+      const hipWidth = shoulderWidth * 0.9
+
+      ctx.beginPath()
+      ctx.moveTo(centerX - shoulderWidth / 2, shoulderY)
+      ctx.quadraticCurveTo(centerX - waistWidth / 2, waistY, centerX - hipWidth / 2, hipY)
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.moveTo(centerX + shoulderWidth / 2, shoulderY)
+      ctx.quadraticCurveTo(centerX + waistWidth / 2, waistY, centerX + hipWidth / 2, hipY)
+      ctx.stroke()
+
+      const elbowY = shoulderY + headHeight * 1.5
+      const wristY = shoulderY + headHeight * 2.5
+      const armWidth = headHeight * 0.3
+
+      ctx.beginPath()
+      ctx.moveTo(centerX - shoulderWidth / 2, shoulderY)
+      ctx.lineTo(centerX - shoulderWidth / 2 - armWidth, elbowY)
+      ctx.lineTo(centerX - shoulderWidth / 2 - armWidth * 0.5, wristY)
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.moveTo(centerX + shoulderWidth / 2, shoulderY)
+      ctx.lineTo(centerX + shoulderWidth / 2 + armWidth, elbowY)
+      ctx.lineTo(centerX + shoulderWidth / 2 + armWidth * 0.5, wristY)
+      ctx.stroke()
+
+      const legWidth = headHeight * 0.4
+      const kneeY = hipY + headHeight * 2
+      const maxAnkleY = startY + totalHeight
+      const ankleY = Math.min(hipY + headHeight * 4, maxAnkleY)
+
+      ctx.beginPath()
+      ctx.moveTo(centerX - hipWidth / 4, hipY)
+      ctx.lineTo(centerX - legWidth / 2, kneeY)
+      ctx.lineTo(centerX - legWidth / 3, ankleY)
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.moveTo(centerX + hipWidth / 4, hipY)
+      ctx.lineTo(centerX + legWidth / 2, kneeY)
+      ctx.lineTo(centerX + legWidth / 3, ankleY)
+      ctx.stroke()
+
+      ctx.restore()
     }
 
-    // Always show the guide
     drawHumanGuide()
 
-    // Set drawing style
     ctx.strokeStyle = '#00ff00'
     ctx.lineWidth = 2
     ctx.fillStyle = '#00ff00'
 
-    // Draw keypoints
-    poseResults.landmarks.forEach((landmark, index) => {
+    poseResults.landmarks.forEach((landmark: any, index: number) => {
       if (landmark.confidence > 0.3) {
-        // Transform coordinates from video space to canvas space
-        // Account for object-contain scaling and centering
-        // Since the canvas has -scale-x-100 applied, we need to flip the x-coordinate
-        const x = canvas.width - ((landmark.x * scale) + offsetX)
-        const y = (landmark.y * scale) + offsetY
+        const x = canvas.width - (landmark.x * scale + offsetX)
+        const y = landmark.y * scale + offsetY
 
-        // Check if this landmark is relevant for the current clothing type
         const isRelevant = poseStability?.relevantLandmarks.includes(index) ?? false
-        
-        // Draw keypoint with different colors for relevant vs non-relevant
+
         ctx.fillStyle = isRelevant ? '#00ff00' : '#666666'
         ctx.beginPath()
         ctx.arc(x, y, isRelevant ? 8 : 4, 0, 2 * Math.PI)
         ctx.fill()
-        
-        // Reset fill style for lines
+
         ctx.fillStyle = '#00ff00'
       }
     })
 
-    // Draw connecting lines between relevant landmarks (skeleton)
     const skeletonConnections = [
-      // Head and shoulders
-      [0, 5], [0, 6], // nose to shoulders
-      [1, 3], [2, 4], // eyes to ears
-      [3, 5], [4, 6], // ears to shoulders
-      
-      // Upper body
-      [5, 6], // shoulders
-      [5, 7], [6, 8], // shoulders to elbows
-      [7, 9], [8, 10], // elbows to wrists
-      
-      // Torso
-      [5, 11], [6, 12], // shoulders to hips
-      [11, 12], // hips
-      
-      // Lower body
-      [11, 13], [12, 14], // hips to knees
-      [13, 15], [14, 16], // knees to ankles
-      [13, 14] // knees
+      [0, 5],
+      [0, 6],
+      [1, 3],
+      [2, 4],
+      [3, 5],
+      [4, 6],
+      [5, 6],
+      [5, 7],
+      [6, 8],
+      [7, 9],
+      [8, 10],
+      [5, 11],
+      [6, 12],
+      [11, 12],
+      [11, 13],
+      [12, 14],
+      [13, 15],
+      [14, 16],
+      [13, 14],
     ]
 
     skeletonConnections.forEach(([index1, index2]) => {
-        const landmark1 = poseResults.landmarks[index1]
-        const landmark2 = poseResults.landmarks[index2]
-        
-        if (landmark1 && landmark2 && 
-            landmark1.confidence > 0.3 && landmark2.confidence > 0.3) {
-          
-          const x1 = canvas.width - ((landmark1.x * scale) + offsetX)
-          const y1 = (landmark1.y * scale) + offsetY
-          const x2 = canvas.width - ((landmark2.x * scale) + offsetX)
-          const y2 = (landmark2.y * scale) + offsetY
-      
-          // Check if this connection is relevant for the current clothing type
-          const isRelevant = poseStability?.relevantLandmarks.includes(index1) && 
-                            poseStability?.relevantLandmarks.includes(index2)
-          
-          // Draw skeleton line
-          ctx.strokeStyle = isRelevant ? '#00ff00' : '#666666'
-          ctx.lineWidth = isRelevant ? 3 : 1
-          ctx.beginPath()
-          ctx.moveTo(x1, y1)
-          ctx.lineTo(x2, y2)
-          ctx.stroke()
-      
-            if (isRelevant) {
-                const distance = calculateDistance(landmark1, landmark2, scale)
-                
-                // Calculate midpoint for text placement
-                const midX = (x1 + x2) / 2
-                const midY = (y1 + y2) / 2
-                
-                // Calculate perpendicular offset to avoid overlapping with line
-                const lineLength = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-                const offsetDistance = 25 // pixels away from line
-                const offsetX = -(y2 - y1) / lineLength * offsetDistance
-                const offsetY = (x2 - x1) / lineLength * offsetDistance
-                
-                const textX = midX + offsetX
-                const textY = midY + offsetY
-                
-                // Draw text background
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
-                ctx.font = 'bold 12px Arial'
-                const text = `${distance}"`
-                const textWidth = ctx.measureText(text).width
-                ctx.fillRect(textX - textWidth/2 - 3, textY - 8, textWidth + 6, 16)
-                
-                // Draw text
-                ctx.fillStyle = '#00ff00'
-                ctx.textAlign = 'center'
-                ctx.fillText(text, textX, textY + 3)
-            }
-        }
-      })
+      const landmark1 = poseResults.landmarks[index1]
+      const landmark2 = poseResults.landmarks[index2]
 
-    // Draw measurement overlay if measurements are available
+      if (landmark1 && landmark2 && landmark1.confidence > 0.3 && landmark2.confidence > 0.3) {
+        const x1 = canvas.width - (landmark1.x * scale + offsetX)
+        const y1 = landmark1.y * scale + offsetY
+        const x2 = canvas.width - (landmark2.x * scale + offsetX)
+        const y2 = landmark2.y * scale + offsetY
+
+        const isRelevant =
+          (poseStability?.relevantLandmarks.includes(index1) ?? false) &&
+          (poseStability?.relevantLandmarks.includes(index2) ?? false)
+
+        ctx.strokeStyle = isRelevant ? '#00ff00' : '#666666'
+        ctx.lineWidth = isRelevant ? 3 : 1
+        ctx.beginPath()
+        ctx.moveTo(x1, y1)
+        ctx.lineTo(x2, y2)
+        ctx.stroke()
+
+        if (isRelevant) {
+          const distance = calculateDistance(landmark1, landmark2, scale)
+          const midX = (x1 + x2) / 2
+          const midY = (y1 + y2) / 2
+          const lineLength = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+          const offsetDist = 25
+          const offX = (-(y2 - y1) / lineLength) * offsetDist
+          const offY = ((x2 - x1) / lineLength) * offsetDist
+          const textX = midX + offX
+          const textY = midY + offY
+
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+          ctx.font = 'bold 12px Arial'
+          const text = `${distance}"`
+          const textWidth = ctx.measureText(text).width
+          ctx.fillRect(textX - textWidth / 2 - 3, textY - 8, textWidth + 6, 16)
+
+          ctx.fillStyle = '#00ff00'
+          ctx.textAlign = 'center'
+          ctx.fillText(text, textX, textY + 3)
+        }
+      }
+    })
+
     if (measurements && selectedStyleId) {
-      // Define measurement connections and their labels based on clothing type
       const getMeasurementConnections = () => {
         const connections: Array<{
           indices: [number, number]
@@ -785,131 +723,116 @@ export function MeasurementsStepImpl({
 
         switch (selectedStyleId) {
           case 'shirts':
-            // Shoulder width (left shoulder to right shoulder)
             connections.push({
-              indices: [5, 6], // leftShoulder, rightShoulder
+              indices: [5, 6],
               label: 'Shoulder Width',
               value: `${measurements.shoulders}"`,
-              description: 'Distance between shoulder points'
+              description: 'Distance between shoulder points',
             })
-            // Body length (nose to hip center)
             connections.push({
-              indices: [0, 11], // nose to leftHip (approximate)
+              indices: [0, 11],
               label: 'Body Length',
               value: `${measurements.chest}"`,
-              description: 'Upper body length'
+              description: 'Upper body length',
             })
-            // Arm length (shoulder to elbow to wrist)
             connections.push({
-              indices: [5, 7], // leftShoulder to leftElbow
+              indices: [5, 7],
               label: 'Arm Length',
               value: `${measurements.armLength}"`,
-              description: 'Shoulder to elbow'
+              description: 'Shoulder to elbow',
             })
             break
 
           case 'pants':
-            // Hip width (left hip to right hip)
             connections.push({
-              indices: [11, 12], // leftHip, rightHip
+              indices: [11, 12],
               label: 'Hip Width',
               value: `${measurements.hips}"`,
-              description: 'Distance between hip points'
+              description: 'Distance between hip points',
             })
-            // Leg length (hip to knee to ankle)
             connections.push({
-              indices: [11, 13], // leftHip to leftKnee
+              indices: [11, 13],
               label: 'Leg Length',
               value: `${measurements.inseam}"`,
-              description: 'Hip to knee'
+              description: 'Hip to knee',
             })
-            // Waist measurement
             connections.push({
-              indices: [5, 11], // leftShoulder to leftHip (approximate waist)
+              indices: [5, 11],
               label: 'Waist',
               value: `${measurements.waist}"`,
-              description: 'Waist circumference'
+              description: 'Waist circumference',
             })
             break
 
           case 'shorts':
-            // Hip width (left hip to right hip)
             connections.push({
-              indices: [11, 12], // leftHip, rightHip
+              indices: [11, 12],
               label: 'Hip Width',
               value: `${measurements.hips}"`,
-              description: 'Distance between hip points'
+              description: 'Distance between hip points',
             })
-            // Thigh length (hip to knee)
             connections.push({
-              indices: [11, 13], // leftHip to leftKnee
+              indices: [11, 13],
               label: 'Thigh Length',
               value: `${measurements.inseam}"`,
-              description: 'Hip to knee'
+              description: 'Hip to knee',
             })
             break
 
           case 'jackets':
-            // Shoulder width (left shoulder to right shoulder)
             connections.push({
-              indices: [5, 6], // leftShoulder, rightShoulder
+              indices: [5, 6],
               label: 'Shoulder Width',
               value: `${measurements.shoulders}"`,
-              description: 'Distance between shoulder points'
+              description: 'Distance between shoulder points',
             })
-            // Body length (nose to hip center)
             connections.push({
-              indices: [0, 11], // nose to leftHip (approximate)
+              indices: [0, 11],
               label: 'Body Length',
               value: `${measurements.chest}"`,
-              description: 'Upper body length'
+              description: 'Upper body length',
             })
-            // Arm length (shoulder to elbow)
             connections.push({
-              indices: [5, 7], // leftShoulder to leftElbow
+              indices: [5, 7],
               label: 'Arm Length',
               value: `${measurements.armLength}"`,
-              description: 'Shoulder to elbow'
+              description: 'Shoulder to elbow',
             })
             break
 
           case 'activewear':
-            // Shoulder width (left shoulder to right shoulder)
             connections.push({
-              indices: [5, 6], // leftShoulder, rightShoulder
+              indices: [5, 6],
               label: 'Shoulder Width',
               value: `${measurements.shoulders}"`,
-              description: 'Distance between shoulder points'
+              description: 'Distance between shoulder points',
             })
-            // Hip width (left hip to right hip)
             connections.push({
-              indices: [11, 12], // leftHip, rightHip
+              indices: [11, 12],
               label: 'Hip Width',
               value: `${measurements.hips}"`,
-              description: 'Distance between hip points'
+              description: 'Distance between hip points',
             })
-            // Body length (shoulder to hip)
             connections.push({
-              indices: [5, 11], // leftShoulder to leftHip
+              indices: [5, 11],
               label: 'Body Length',
               value: `${measurements.chest}"`,
-              description: 'Shoulder to hip'
+              description: 'Shoulder to hip',
             })
             break
 
           default:
-            // Default connections for unknown clothing types
             connections.push({
-              indices: [5, 6], // leftShoulder, rightShoulder
+              indices: [5, 6],
               label: 'Shoulder Width',
               value: `${measurements.shoulders}"`,
-              description: 'Distance between shoulder points'
+              description: 'Distance between shoulder points',
             })
             connections.push({
-              indices: [11, 12], // leftHip, rightHip
+              indices: [11, 12],
               label: 'Hip Width',
               value: `${measurements.hips}"`,
-              description: 'Distance between hip points'
+              description: 'Distance between hip points',
             })
         }
 
@@ -918,74 +841,55 @@ export function MeasurementsStepImpl({
 
       const measurementConnections = getMeasurementConnections()
 
-      // Draw measurement text for each connection
       measurementConnections.forEach(({ indices, label, value, description }) => {
         const [index1, index2] = indices
         const landmark1 = poseResults.landmarks[index1]
         const landmark2 = poseResults.landmarks[index2]
 
-        if (landmark1 && landmark2 && 
-            landmark1.confidence > 0.3 && landmark2.confidence > 0.3) {
-          
-          // Transform coordinates from video space to canvas space
-          const x1 = canvas.width - ((landmark1.x * scale) + offsetX)
-          const y1 = (landmark1.y * scale) + offsetY
-          const x2 = canvas.width - ((landmark2.x * scale) + offsetX)
-          const y2 = (landmark2.y * scale) + offsetY
+        if (landmark1 && landmark2 && landmark1.confidence > 0.3 && landmark2.confidence > 0.3) {
+          const x1 = canvas.width - (landmark1.x * scale + offsetX)
+          const y1 = landmark1.y * scale + offsetY
+          const x2 = canvas.width - (landmark2.x * scale + offsetX)
+          const y2 = landmark2.y * scale + offsetY
 
-          // Calculate midpoint of the connection
           const midX = (x1 + x2) / 2
           const midY = (y1 + y2) / 2
 
-          // Calculate the angle of the connection for text orientation
           const angle = Math.atan2(y2 - y1, x2 - x1)
 
-          // Save context for rotation
           ctx.save()
-          
-          // Move to midpoint and rotate
           ctx.translate(midX, midY)
           ctx.rotate(angle)
 
-          // Draw background rectangle for text
-          const textWidth = ctx.measureText(`${label}: ${value}`).width
+          const text = `${label}: ${value}`
+          ctx.font = 'bold 12px Arial'
+          const textWidth = ctx.measureText(text).width
           const textHeight = 20
           const padding = 8
-          
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
-          ctx.fillRect(
-            -textWidth / 2 - padding, 
-            -textHeight / 2 - padding, 
-            textWidth + padding * 2, 
-            textHeight + padding * 2
-          )
 
-          // Draw border
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+          ctx.fillRect(-textWidth / 2 - padding, -textHeight / 2 - padding, textWidth + padding * 2, textHeight + padding * 2)
+
           ctx.strokeStyle = '#00ff00'
           ctx.lineWidth = 2
           ctx.strokeRect(
-            -textWidth / 2 - padding, 
-            -textHeight / 2 - padding, 
-            textWidth + padding * 2, 
-            textHeight + padding * 2
+            -textWidth / 2 - padding,
+            -textHeight / 2 - padding,
+            textWidth + padding * 2,
+            textHeight + padding * 2,
           )
 
-          // Draw text
           ctx.fillStyle = '#ffffff'
-          ctx.font = 'bold 12px Arial'
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          ctx.fillText(`${label}: ${value}`, 0, 0)
+          ctx.fillText(text, 0, 0)
 
-          // Draw description below
           ctx.font = '10px Arial'
           ctx.fillStyle = '#cccccc'
           ctx.fillText(description, 0, 15)
 
-          // Restore context
           ctx.restore()
 
-          // Draw a small indicator dot at the midpoint
           ctx.fillStyle = '#00ff00'
           ctx.beginPath()
           ctx.arc(midX, midY, 4, 0, 2 * Math.PI)
@@ -998,54 +902,31 @@ export function MeasurementsStepImpl({
       keypoints: poseResults.landmarks.length,
       scale,
       offsetX,
-      offsetY
+      offsetY,
     })
-  }, [poseResults, measurements, selectedStyleId])
+  }, [poseResults, measurements, selectedStyleId, poseStability])
 
   const checkPoseDetectionStatus = useCallback(() => {
-    // Check if pose detection is currently loading
-    if (isPoseLoading) {
-      Logger.info('Pose detection is still loading...')
-      return 'loading'
-    }
-    
-    // Check if pose detection failed to initialize
-    if (poseError) {
-      Logger.warn('Pose detection has a real error:', poseError)
-      return 'error'
-    }
-    
-    // Check if pose detection is ready
-    if (isPoseInitialized) {
-      Logger.info('Pose detection is ready')
-      return 'ready'
-    }
-    
-    // Default state - not started yet
+    if (isPoseLoading) return 'loading'
+    if (poseError) return 'error'
+    if (isPoseInitialized) return 'ready'
     return 'not-started'
   }, [isPoseLoading, poseError, isPoseInitialized])
 
-  // Demo mode activation
   const enableDemoMode = useCallback(() => {
     Logger.info('Enabling demo mode - camera not available')
     setIsDemoMode(true)
     setCameraError('')
-    
-    // Mock successful pose detection after delay
     setTimeout(async () => {
       Logger.info('Demo mode: Initializing mock pose detection')
-      
-      // Initialize pose detection in demo mode
       if (videoRef.current) {
         await initializePose(videoRef.current)
         await startDetection()
       }
-      
       Logger.info('Demo mode: Ready for measurements')
     }, 1000)
   }, [initializePose, startDetection])
 
-  // Enhanced camera initialization
   const startCamera = useCallback(async () => {
     if (hasBootedRef.current || !videoRef.current) {
       Logger.warn('startCamera: Already booted or no video element')
@@ -1058,38 +939,21 @@ export function MeasurementsStepImpl({
 
     try {
       const video = videoRef.current
-
-      // Check if getUserMedia is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera API not supported in this environment')
       }
 
-      // Enhanced camera constraints with fallbacks
       const cameraConstraints = [
         {
-          video: {
-            facingMode: 'user',
-            width: { ideal: 640, min: 320 },
-            height: { ideal: 480, min: 240 },
-            frameRate: { ideal: 30, min: 15 }
-          }
+          video: { facingMode: 'user', width: { ideal: 640, min: 320 }, height: { ideal: 480, min: 240 }, frameRate: { ideal: 30, min: 15 } },
         },
-        {
-          video: {
-            facingMode: 'user',
-            width: { ideal: 480 },
-            height: { ideal: 360 }
-          }
-        },
-        {
-          video: true
-        }
+        { video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 360 } } },
+        { video: true },
       ]
 
       let stream: MediaStream | null = null
       let lastError: Error | null = null
 
-      // Try each constraint set
       for (const constraints of cameraConstraints) {
         try {
           Logger.info('Trying camera constraints:', constraints)
@@ -1107,45 +971,34 @@ export function MeasurementsStepImpl({
         throw lastError || new Error('All camera configurations failed')
       }
 
-      // Set up video stream
       video.srcObject = stream
       Logger.info('Camera stream set on video element')
 
-      // Wait for video to load with timeout and better error handling
       await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Video loading timeout - video may not be ready'))
-        }, 15000) // Increased timeout
+        const timeout = setTimeout(() => reject(new Error('Video loading timeout - video may not be ready')), 15000)
 
         const onLoadedMetadata = () => {
           clearTimeout(timeout)
           video.removeEventListener('loadedmetadata', onLoadedMetadata)
           video.removeEventListener('error', onError)
           video.removeEventListener('canplay', onCanPlay)
-          
-          // Additional check for video dimensions
           if (video.videoWidth === 0 || video.videoHeight === 0) {
             reject(new Error('Video dimensions not available'))
             return
           }
-          
           Logger.info('Video metadata loaded successfully', {
             dimensions: `${video.videoWidth}x${video.videoHeight}`,
-            readyState: video.readyState
+            readyState: video.readyState,
           })
           resolve()
         }
 
-        const onCanPlay = () => {
-          Logger.info('Video can start playing')
-        }
-
+        const onCanPlay = () => Logger.info('Video can start playing')
         const onError = (event: Event) => {
           clearTimeout(timeout)
           video.removeEventListener('loadedmetadata', onLoadedMetadata)
           video.removeEventListener('error', onError)
           video.removeEventListener('canplay', onCanPlay)
-          
           const error = event as ErrorEvent
           Logger.error('Video load error', { error: error.message || 'Unknown video error' })
           reject(new Error('Video load error: ' + (error.message || 'Unknown error')))
@@ -1154,149 +1007,100 @@ export function MeasurementsStepImpl({
         video.addEventListener('loadedmetadata', onLoadedMetadata)
         video.addEventListener('canplay', onCanPlay)
         video.addEventListener('error', onError)
-        
-        // Force load if not already loading
-        if (video.readyState < 1) {
-          video.load()
-        }
+        if (video.readyState < 1) video.load()
       })
 
-      // Try to play video with retry logic
-      let playAttempts = 0
-      const maxPlayAttempts = 3
-      
-      while (playAttempts < maxPlayAttempts) {
+      let attempts = 0
+      while (attempts < 3) {
         try {
           await video.play()
           Logger.info('Video playing successfully')
           break
-        } catch (playError) {
-          playAttempts++
-          Logger.warn(`Video play attempt ${playAttempts} failed:`, playError)
-          
-          if (playAttempts >= maxPlayAttempts) {
-            throw new Error(`Failed to play video after ${maxPlayAttempts} attempts`)
-          }
-          
-          // Wait a bit before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000))
+        } catch (e) {
+          attempts++
+          Logger.warn(`Video play attempt ${attempts} failed:`, e)
+          if (attempts >= 3) throw new Error('Failed to play video after 3 attempts')
+          await new Promise((r) => setTimeout(r, 1000))
         }
       }
 
       syncCanvasToVideo()
 
-      // Initialize pose detection with better error handling
       try {
         await initializePose(video)
         Logger.info('Pose detection model initialized')
-
         await startDetection()
         Logger.info('Pose detection started successfully')
-      } catch (poseError) {
-        const poseErrorMessage = (poseError as Error).message
-        Logger.warn('Pose detection initialization failed, checking status...', { 
-          error: poseErrorMessage
-        })
-      
-        // Check what's actually happening with pose detection
-        const poseStatus = checkPoseDetectionStatus()
-        
-        if (poseStatus === 'loading') {
-          // Pose detection is still loading - this is not an error!
-          Logger.info('Pose detection is loading, showing loading state')
+      } catch (poseErr) {
+        Logger.warn('Pose detection initialization failed, checking status...', { error: (poseErr as Error).message })
+        const status = checkPoseDetectionStatus()
+        if (status === 'loading') {
           setIsPoseDetectionWaiting(true)
-          setCameraError('') // Clear any previous errors
-          
-          // Set up auto-retry when pose detection becomes ready
+          setCameraError('')
           setupPoseDetectionRetry()
           return
         } else {
-          // This is a real error
-          Logger.error('Real pose detection error occurred')
           setCameraError(`The camera will be used to calculate your measurements`)
           return
         }
       }
-
     } catch (error) {
-      const errorMessage = (error as Error).message
-      Logger.error('Camera initialization failed', { 
-        error: errorMessage,
-        stack: (error as Error).stack
-      })
+      const message = (error as Error).message
+      Logger.error('Camera initialization failed', { error: message, stack: (error as Error).stack })
 
-      // Set user-friendly error messages
-      let userFriendlyMessage = errorMessage
-      
-      if (errorMessage.includes('Permission denied') || errorMessage.includes('NotAllowedError')) {
-        userFriendlyMessage = 'Camera access denied. Please allow camera permissions and try again.'
-      } else if (errorMessage.includes('NotFoundError') || errorMessage.includes('DevicesNotFoundError')) {
-        userFriendlyMessage = 'No camera found. Please ensure your device has a camera and try again.'
-      } else if (errorMessage.includes('NotReadableError') || errorMessage.includes('TrackStartError')) {
-        userFriendlyMessage = 'Camera is busy or unavailable. Please close other apps using the camera and try again.'
-      } else if (errorMessage.includes('aborted') || errorMessage.includes('AbortError')) {
-        userFriendlyMessage = 'Camera access was interrupted. Please try again.'
-      } else if (errorMessage.includes('NotSupportedError') || errorMessage.includes('not supported')) {
-        userFriendlyMessage = 'Camera not supported in this environment. Please use a different browser or device.'
+      let userMessage = message
+      if (message.includes('Permission denied') || message.includes('NotAllowedError')) {
+        userMessage = 'Camera access denied. Please allow camera permissions and try again.'
+      } else if (message.includes('NotFoundError') || message.includes('DevicesNotFoundError')) {
+        userMessage = 'No camera found. Please ensure your device has a camera and try again.'
+      } else if (message.includes('NotReadableError') || message.includes('TrackStartError')) {
+        userMessage = 'Camera is busy or unavailable. Please close other apps using the camera and try again.'
+      } else if (message.includes('AbortError')) {
+        userMessage = 'Camera access was interrupted. Please try again.'
+      } else if (message.includes('NotSupportedError') || message.includes('not supported')) {
+        userMessage = 'Camera not supported in this environment. Please use a different browser or device.'
       }
 
-      setCameraError(userFriendlyMessage)
+      setCameraError(userMessage)
       hasBootedRef.current = false
-      
-      // Enable demo mode for testing
       enableDemoMode()
     }
-  }, [syncCanvasToVideo, initializePose, startDetection, enableDemoMode])
-
+  }, [syncCanvasToVideo, initializePose, startDetection, enableDemoMode, checkPoseDetectionStatus])
 
   const setupPoseDetectionRetry = useCallback(() => {
     Logger.info('Setting up pose detection auto-retry...')
-    
-    // Clear any existing timer
-    if (retryTimerRef.current) {
-      clearInterval(retryTimerRef.current)
-    }
-    
-    const checkInterval = 500 // Check every 500ms
-    const maxRetries = 60 // Maximum 30 seconds
+    if (retryTimerRef.current) clearInterval(retryTimerRef.current)
+
+    const checkInterval = 500
+    const maxRetries = 60
     let retryCount = 0
-    
+
     retryTimerRef.current = setInterval(async () => {
       retryCount++
-      const poseStatus = checkPoseDetectionStatus()
-      
-      Logger.debug(`Pose detection retry ${retryCount}/${maxRetries}, status: ${poseStatus}`)
-      
-      if (poseStatus === 'ready' && videoRef.current) {
-        // Success - pose detection is ready
+      const status = checkPoseDetectionStatus()
+      Logger.debug(`Pose detection retry ${retryCount}/${maxRetries}, status: ${status}`)
+
+      if (status === 'ready' && videoRef.current) {
         Logger.info('Pose detection became ready, attempting to start...')
-        
         if (retryTimerRef.current) {
           clearInterval(retryTimerRef.current)
           retryTimerRef.current = null
         }
-        
         setIsPoseDetectionWaiting(false)
-        
         try {
           await startDetection()
           Logger.info('Pose detection started successfully after retry')
-        } catch (retryError) {
-          Logger.error('Failed to start detection after retry:', retryError)
+        } catch (e) {
+          Logger.error('Failed to start detection after retry:', e)
           setCameraError('Pose detection failed to start. You can still use manual measurements.')
         }
-        
-      } else if (poseStatus === 'error' || retryCount >= maxRetries) {
-        // Failure - real error or timeout
-        Logger.warn('Giving up on pose detection retry', { poseStatus, retryCount })
-        
+      } else if (status === 'error' || retryCount >= maxRetries) {
+        Logger.warn('Giving up on pose detection retry', { status, retryCount })
         if (retryTimerRef.current) {
           clearInterval(retryTimerRef.current)
           retryTimerRef.current = null
         }
-        
         setIsPoseDetectionWaiting(false)
-        
         if (retryCount >= maxRetries) {
           setCameraError('Pose detection is taking too long to load. You can still use manual measurements.')
         } else {
@@ -1310,23 +1114,22 @@ export function MeasurementsStepImpl({
     Logger.info('Taking measurement', {
       poseDetected: poseResults?.isDetected,
       confidence: poseResults?.confidence,
-      demoMode: isDemoMode
+      demoMode: isDemoMode,
     })
     setIsProcessing(true)
-    
     setTimeout(() => {
-      const mockMeasurements: Measurements = {
-        chest: 42, 
-        waist: 32, 
-        hips: 38, 
+      const mock: Measurements = {
+        chest: 42,
+        waist: 32,
+        hips: 38,
         shoulders: 18,
-        armLength: 25, 
-        inseam: 32, 
-        height: 70, 
-        weight: 165
+        armLength: 25,
+        inseam: 32,
+        height: 70,
+        weight: 165,
       }
-      Logger.info('Measurements calculated', { measurements: mockMeasurements })
-      setMeasurements(mockMeasurements)
+      Logger.info('Measurements calculated', { measurements: mock })
+      setMeasurements(mock)
       setIsProcessing(false)
       if (!isDemoMode) {
         stopCamera()
@@ -1360,11 +1163,6 @@ export function MeasurementsStepImpl({
     startCamera()
   }
 
-
-
-
-
-
   // Start camera automatically on mount
   useEffect(() => {
     Logger.info('Component mounted, starting camera')
@@ -1372,26 +1170,23 @@ export function MeasurementsStepImpl({
 
     return () => {
       Logger.info('Component unmounting, cleaning up camera and pose detection')
-
-      // Clear retry timer
       if (retryTimerRef.current) {
         clearInterval(retryTimerRef.current)
         retryTimerRef.current = null
       }
-      
       try {
         stopDetection()
       } catch (err) {
         Logger.warn('Error stopping detection during cleanup', { error: (err as Error).message })
       }
       if (videoRef.current?.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop())
+        ;(videoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop())
         videoRef.current.srcObject = null
       }
       cleanup()
       hasBootedRef.current = false
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Keep canvas sized on resize
@@ -1404,7 +1199,6 @@ export function MeasurementsStepImpl({
     return () => window.removeEventListener('resize', onResize)
   }, [syncCanvasToVideo])
 
-  // Log pose detection state changes
   useEffect(() => {
     if (isPoseLoading) {
       Logger.info('Pose detection model loading...')
@@ -1413,35 +1207,32 @@ export function MeasurementsStepImpl({
     }
   }, [isPoseLoading, isPoseInitialized])
 
-  // Log pose detection results
   useEffect(() => {
     if (poseResults?.isDetected) {
       Logger.debug('Pose detected', {
         confidence: poseResults.confidence,
-        landmarksCount: poseResults.landmarks?.length
+        landmarksCount: poseResults.landmarks?.length,
       })
     }
   }, [poseResults])
 
-  // Log pose stability changes for debugging
   useEffect(() => {
     if (poseStability) {
       Logger.debug('Pose stability updated', {
         stabilityScore: poseStability.stabilityScore,
         isStable: poseStability.isStable,
-        relevantLandmarks: poseStability.relevantLandmarks.length
+        relevantLandmarks: poseStability.relevantLandmarks.length,
       })
     }
   }, [poseStability])
 
-  // Log errors
   useEffect(() => {
     if (poseError) {
       Logger.error('Pose detection error', { error: poseError })
     }
   }, [poseError])
 
-  // Add LoadingOverlay component definition here - BEFORE return statement
+  // Loading overlay
   const LoadingOverlay = () => (
     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
       <div className="bg-white bg-opacity-90 rounded-lg p-6 text-center shadow-lg">
@@ -1449,55 +1240,47 @@ export function MeasurementsStepImpl({
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
           <span className="text-lg font-semibold text-gray-800">Loading pose detection...</span>
         </div>
-        <p className="text-sm text-gray-600">
-          Initializing AI model for automatic measurements
-        </p>
+        <p className="text-sm text-gray-600">Initializing AI model for automatic measurements</p>
       </div>
     </div>
   )
 
   return (
-    <div className="min-h-screen flex flex-col bg-black">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">{selectedCompanyName}</span>
-              <span className="text-gray-400">•</span>
-              <span className="text-sm text-gray-500">{selectedStyleName}</span>
-              <span className="text-gray-400">•</span>
-              <span className="text-sm text-gray-500">{selectedSubStyleName}</span>
-              <span className="text-gray-400">•</span>
-              <span className="text-sm font-medium text-blue-600">Step 5 of 6</span>
-            </div>
-            <button
-              onClick={onCancel}
-              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1 rounded-md hover:bg-gray-100 transition-colors"
-            >
-              Cancel
-            </button>
+    <div className="min-h-screen flex flex-col bg-[#550cff]">
+      {/* Themed header (matches steps 2/3): back button in top-left, centered step/title/subtitle */}
+      <header className="relative bg-transparent">
+        <button
+          onClick={onCancel}
+          aria-label="Back"
+          className="absolute top-3 left-3 z-10 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/70 text-gray-900 hover:bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="text-sm">Back</span>
+        </button>
+
+        <div className="px-4 pt-12 pb-4 text-center">
+          <div className="mb-1">
+            <span className="text-sm font-medium text-white">Step 5 of 6</span>
           </div>
-          <h1 className="text-xl font-bold text-gray-900">Get Your Measurements</h1>
-          <p className="text-sm text-gray-500">
-            {isDemoMode ? 'Demo Mode - Simulated measurements' : "We'll use your camera to measure you perfectly"}
+          <h1 className="text-2xl font-extrabold text-white">Get Your Measurements</h1>
+          <p className="text-sm text-white/80">
+            {isDemoMode ? 'Demo Mode - Simulated measurements' : "We’ll use your camera to measure you perfectly"}
           </p>
         </div>
       </header>
 
-      
-      {/* Main content area */}
-      <main className="relative flex-1 overflow-hidden">
-        {/* Confidence Threshold Component - Top UI */}
+      {/* Main content */}
+      <main className="relative flex-1 overflow-hidden bg-black rounded-t-3xl">
+        {/* Confidence bar */}
         <ConfidenceThreshold
           validation={validation}
           isVisible={Boolean(!isDemoMode && !measurements && !isProcessing && selectedStyleId && poseResults?.isDetected)}
           poseStability={poseStability}
         />
 
-
         {isDemoMode ? (
-          // Demo mode UI
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
             <div className="text-white text-center p-8">
               <div className="w-32 h-32 mx-auto mb-6 border-4 border-white rounded-full flex items-center justify-center">
@@ -1506,16 +1289,13 @@ export function MeasurementsStepImpl({
                 </svg>
               </div>
               <h2 className="text-2xl font-bold mb-2">Demo Mode</h2>
-              <p className="text-blue-100 mb-4">Camera not available - using simulated measurements</p>
+              <p className="text-blue-100 mb-4">Camera not available — using simulated measurements</p>
               <div className="bg-white/20 rounded-lg p-4 backdrop-blur">
-                <p className="text-sm">
-                  {isPoseInitialized ? '✅ Ready to take measurements' : '⏳ Initializing...'}
-                </p>
+                <p className="text-sm">{isPoseInitialized ? '✅ Ready to take measurements' : '⏳ Initializing...'}</p>
               </div>
             </div>
           </div>
         ) : (
-          // Normal camera UI
           <>
             <video
               ref={videoRef}
@@ -1532,13 +1312,9 @@ export function MeasurementsStepImpl({
               style={{ zIndex: 10, transformOrigin: 'center' }}
             />
 
-            {/* NEW: Add the loading overlay here */}
             {isPoseDetectionWaiting && <LoadingOverlay />}
-
           </>
         )}
-
-
 
         {/* Camera error UI */}
         {cameraError && !isDemoMode && (
@@ -1551,29 +1327,26 @@ export function MeasurementsStepImpl({
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Warning</h3>
               <p className="text-sm text-gray-600 mb-4">{cameraError}</p>
-                             <div className="flex gap-3">
-                 <button
-                   onClick={retryCamera}
-                   className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700"
-                 >
-                   Agree
-                 </button>
-               </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={retryCamera}
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700"
+                >
+                  Agree
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Clothing Instructions */}
+        {/* Clothing instructions */}
         {!isDemoMode && !measurements && !isProcessing && selectedStyleId && (
           <div className="absolute bottom-20 left-0 right-0 z-20 px-4">
             <div className="bg-black/60 backdrop-blur-sm text-white text-center py-3 px-4 rounded-lg">
-              <p className="text-sm font-medium">
-                {getClothingInstructions(selectedStyleId)}
-              </p>
+              <p className="text-sm font-medium">{getClothingInstructions(selectedStyleId)}</p>
             </div>
           </div>
         )}
-
 
         {/* Processing overlay */}
         {isProcessing && (
@@ -1602,7 +1375,7 @@ export function MeasurementsStepImpl({
                   { label: 'Hips', value: measurements.hips },
                   { label: 'Shoulders', value: measurements.shoulders },
                   { label: 'Arm Length', value: measurements.armLength },
-                  { label: 'Inseam', value: measurements.inseam }
+                  { label: 'Inseam', value: measurements.inseam },
                 ].map(({ label, value }) => (
                   <div key={label} className="text-center">
                     <p className="text-2xl font-bold text-blue-600">{value}"</p>
@@ -1629,10 +1402,6 @@ export function MeasurementsStepImpl({
           </div>
         )}
       </main>
-
-
-
-
     </div>
   )
 }
