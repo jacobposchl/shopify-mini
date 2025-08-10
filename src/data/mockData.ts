@@ -155,10 +155,10 @@ export const companies: Company[] = [
 // Kept untyped on purpose, since your Style interface doesn’t include iconUrl.
 // Components read iconUrl with a narrow type/any cast.
 export const styles = [
-  { id: 'shirts',  name: 'Shirts',  iconUrl: 'https://cdn-icons-png.flaticon.com/512/392/392043.png'  },
-  { id: 'pants',   name: 'Pants',   iconUrl: 'https://cdn-icons-png.flaticon.com/512/808/808726.png' },
-  { id: 'shorts',  name: 'Shorts',  iconUrl: 'https://cdn-icons-png.flaticon.com/512/120/120041.png'   },
-  { id: 'jackets', name: 'Jackets', iconUrl: 'https://cdn-icons-png.flaticon.com/512/755/755999.png'   },
+  { id: 'shirts',  name: 'Shirts',  iconUrl: 'https://i.postimg.cc/nh45frM2/32839036-cd91-483f-961c-39cf78f778c3.png'  },
+  { id: 'pants',   name: 'Pants',   iconUrl: 'https://i.postimg.cc/HWfdpJs1/Chat-GPT-Image-Aug-10-2025-12-58-07-PM.png' },
+  { id: 'shorts',  name: 'Shorts',  iconUrl: 'https://i.postimg.cc/TYgGhRpL/Chat-GPT-Image-Aug-10-2025-12-58-10-PM.png'   },
+  { id: 'jackets', name: 'Jackets', iconUrl: 'https://i.postimg.cc/2SYYZPZH/Chat-GPT-Image-Aug-10-2025-12-58-12-PM.png'   },
 ]
 
 // Substyles only for the 4 visible style categories (no dresses/activewear to avoid unreachable options)
