@@ -1,5 +1,14 @@
 import { Company, Style, SubStyle, ClothingItem } from '../types'
 
+// src/data/mockData.ts
+import type { Company, Style, SubStyle, ClothingItem } from '../types'
+
+// Force a URL string with Vite’s ?url suffix (removes any interop ambiguity)
+import shirtsPngUrl  from '../assets/icons/styles/shirts.png?url'
+import pantsPngUrl   from '../assets/icons/styles/pants.png?url'
+import shortsPngUrl  from '../assets/icons/styles/shorts.png?url'
+import jacketsPngUrl from '../assets/icons/styles/jackets.png?url'
+
 export const companies: Company[] = [
   {
     id: 'nike',
@@ -39,43 +48,11 @@ export const companies: Company[] = [
   }
 ]
 
-export const styles: Style[] = [
-  {
-    id: 'shirts',
-    name: 'Shirts',
-    icon: '👕',
-    border: {
-      color: '#000000',
-      width: 2
-    }
-  },
-  {
-    id: 'pants',
-    name: 'Pants',
-    icon: '👖',
-    border: {
-      color: '#000000',
-      width: 2
-    }
-  },
-  {
-    id: 'shorts',
-    name: 'Shorts',
-    icon: '🩳',
-    border: {
-      color: '#000000',
-      width: 2
-    }
-  },
-  {
-    id: 'jackets',
-    name: 'Jackets',
-    icon: '🧥',
-    border: {
-      color: '#000000',
-      width: 2
-    }
-  }
+export const styles = [
+  { id: 'shirts',  name: 'Shirts',  iconUrl: 'https://cdn-icons-png.flaticon.com/512/392/392043.png'  },
+  { id: 'pants',   name: 'Pants',   iconUrl: 'https://cdn-icons-png.flaticon.com/512/3531/3531748.png'   },
+  { id: 'shorts',  name: 'Shorts',  iconUrl: 'https://cdn-icons-png.flaticon.com/512/120/120041.png'  },
+  { id: 'jackets', name: 'Jackets', iconUrl: 'https://cdn-icons-png.flaticon.com/512/755/755999.png' }
 ]
 
 export const subStyles: SubStyle[] = [

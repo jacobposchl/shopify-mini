@@ -1,3 +1,4 @@
+import React from 'react'
 import { ClothingItem } from '../types'
 import { clothingItems } from '../data/mockData'
 
@@ -7,9 +8,10 @@ interface ClothingSelectionProps {
   selectedCompanyId?: string
   selectedStyleId?: string
   selectedSubStyleId?: string
-  selectedCompanyName?: string
-  selectedStyleName?: string
-  selectedSubStyleName?: string
+  selectedCompanyName?: string // kept for compatibility; not rendered
+  selectedStyleName?: string   // kept for compatibility; not rendered
+  selectedSubStyleName?: string// kept for compatibility; not rendered
+  onBack?: () => void
 }
 
 export function ClothingSelection({
@@ -18,67 +20,48 @@ export function ClothingSelection({
   selectedCompanyId,
   selectedStyleId,
   selectedSubStyleId,
-  selectedCompanyName,
-  selectedStyleName,
-  selectedSubStyleName
+  onBack,
 }: ClothingSelectionProps) {
-  // Debug logging
-  console.log('ClothingSelection Debug:', {
-    selectedCompanyId,
-    selectedStyleId,
-    selectedSubStyleId,
-    totalItems: clothingItems.length
-  })
-
-  // Filter clothing items based on user selections
   const filteredItems = clothingItems.filter(item => {
     const matchesCompany = selectedCompanyId ? item.companyId === selectedCompanyId : true
     const matchesStyle = selectedStyleId ? item.styleId === selectedStyleId : true
     const matchesSubStyle = selectedSubStyleId ? item.subStyleId === selectedSubStyleId : true
-    
-    console.log('Item filter check:', {
-      itemName: item.name,
-      itemCompanyId: item.companyId,
-      itemStyleId: item.styleId,
-      itemSubStyleId: item.subStyleId,
-      matchesCompany,
-      matchesStyle,
-      matchesSubStyle
-    })
-    
     return matchesCompany && matchesStyle && matchesSubStyle
   })
 
-  console.log('Filtered items count:', filteredItems.length)
-
-  // Use filtered items, or fall back to all items if none found (for debugging)
   const displayItems = filteredItems.length > 0 ? filteredItems : clothingItems
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="px-4 py-3">
-          <div className="flex items-center space-x-2 mb-1">
-            <span className="text-sm text-gray-500">{selectedCompanyName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm text-gray-500">{selectedStyleName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm text-gray-500">{selectedSubStyleName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm font-medium text-blue-600">Step 4 of 6</span>
+    <div className="min-h-screen bg-[#550cff]">
+      {/* Header (Back absolute; centered; only Step shown) */}
+      <header className="relative bg-transparent">
+        {onBack && (
+          <button
+            onClick={onBack}
+            aria-label="Back"
+            className="absolute top-3 left-3 z-10 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/70 text-gray-900 hover:bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="text-sm">Back</span>
+          </button>
+        )}
+
+        <div className="px-4 pt-12 pb-4 text-center">
+          <div className="mb-1">
+            <span className="text-sm font-medium text-white">Step 4 of 6</span>
           </div>
-          <h1 className="text-xl font-bold text-gray-900">Choose Your Item</h1>
-          <p className="text-sm text-gray-500">Select the perfect item for you</p>
+          <h1 className="text-xl font-bold text-white">Choose Your Item</h1>
+          <p className="text-sm text-white/80">Select the perfect item for you</p>
           {filteredItems.length === 0 && clothingItems.length > 0 && (
-            <p className="text-xs text-orange-600 mt-1">
+            <p className="text-xs text-white/80 mt-1">
               Showing all items (no filtered matches found)
             </p>
           )}
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="px-4 py-6">
         {displayItems.length > 0 ? (
           <div className="space-y-4">
@@ -142,33 +125,17 @@ export function ClothingSelection({
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
+          <div className="text-center py-12 text-white">
+            <svg className="mx-auto h-12 w-12 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4-0.881-6.08-2.33" />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No items found</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Try adjusting your selections to find more options.
-            </p>
-            {/* Debug info */}
-            <div className="mt-4 text-xs text-gray-400">
-              <p>Debug: Company ID: {selectedCompanyId}</p>
-              <p>Debug: Style ID: {selectedStyleId}</p>
-              <p>Debug: SubStyle ID: {selectedSubStyleId}</p>
-              <p>Debug: Total items: {clothingItems.length}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Continue Button */}
-        {selectedItem && (
-          <div className="mt-8">
-            <button className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-              Continue with {selectedItem.name}
-            </button>
+            <h3 className="mt-2 text-sm font-medium">No items found</h3>
+            <p className="mt-1 text-sm text-white/80">Try adjusting your selections to find more options.</p>
           </div>
         )}
       </main>
     </div>
   )
 }
+
+

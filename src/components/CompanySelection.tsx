@@ -1,3 +1,4 @@
+// src/components/CompanySelection.tsx
 import React from 'react'
 import { Card } from '@shopify/shop-minis-react'
 import { Company } from '../types'
@@ -5,10 +6,10 @@ import { companies } from '../data/mockData'
 
 interface CompanySelectionProps {
   onCompanySelect: (company: Company) => void
-  selectedCompany?: Company
+  selectedCompany?: Company // kept for compatibility; no continue button rendered
 }
 
-export function CompanySelection({ onCompanySelect, selectedCompany }: CompanySelectionProps) {
+export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -38,17 +39,7 @@ export function CompanySelection({ onCompanySelect, selectedCompany }: CompanySe
           ))}
         </div>
 
-        {/* Continue Button */}
-        {selectedCompany && (
-          <div className="mt-8 px-4 max-w-md mx-auto">
-            <button
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-              onClick={() => onCompanySelect(selectedCompany)}
-            >
-              Continue with {selectedCompany.name}
-            </button>
-          </div>
-        )}
+        {/* ⛔️ Removed the 'Continue with …' button block */}
       </main>
     </div>
   )

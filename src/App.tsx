@@ -21,6 +21,10 @@ export function App() {
     goToPreviousStep
   } = useFlowState()
 
+  const handleBack = () => {
+    goToPreviousStep()
+  }
+
   const handleCompanySelect = (company: any) => {
     selectCompany(company)
     goToNextStep()
@@ -37,10 +41,8 @@ export function App() {
   }
 
   const handleItemSelect = (item: any) => {
-    // Find the selected item in our data
     const selectedItem = clothingItems.find(clothingItem => clothingItem.id === item.id)
     if (selectedItem) {
-      // Store the selected item for later use
       setRecommendations([{
         item: selectedItem,
         recommendedSize: 'M',
@@ -62,14 +64,13 @@ export function App() {
 
   const handleMeasurementsComplete = (measurements: any) => {
     setMeasurements(measurements)
-    
-    // Generate recommendation based on selected item and measurements
+
     if (flowState.recommendations && flowState.recommendations.length > 0) {
       const selectedItem = flowState.recommendations[0].item
       const recommendation = generateRecommendation(selectedItem, measurements)
       setRecommendations([recommendation])
     }
-    
+
     goToNextStep()
   }
 
@@ -78,11 +79,9 @@ export function App() {
   }
 
   const handleAddToCart = () => {
-    // In a real app, this would add the item to cart
     alert('Item added to cart!')
   }
 
-  // Render the appropriate component based on current step
   const renderCurrentStep = () => {
     switch (flowState.currentStep) {
       case 'company-selection':
@@ -99,6 +98,7 @@ export function App() {
             onStyleSelect={handleStyleSelect}
             selectedStyle={flowState.userPreferences.selectedStyle}
             selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
+            onBack={handleBack}
           />
         )
 
@@ -110,6 +110,7 @@ export function App() {
             selectedStyleId={flowState.userPreferences.selectedStyle?.id}
             selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
             selectedStyleName={flowState.userPreferences.selectedStyle?.name}
+            onBack={handleBack}
           />
         )
 
@@ -124,6 +125,7 @@ export function App() {
             selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
             selectedStyleName={flowState.userPreferences.selectedStyle?.name}
             selectedSubStyleName={flowState.userPreferences.selectedSubStyle?.name}
+            onBack={handleBack}
           />
         )
 
@@ -136,6 +138,7 @@ export function App() {
             selectedStyleName={flowState.userPreferences.selectedStyle?.name}
             selectedSubStyleName={flowState.userPreferences.selectedSubStyle?.name}
             selectedStyleId={flowState.userPreferences.selectedStyle?.id}
+            onBack={handleBack}
           />
         )
 
@@ -172,9 +175,5 @@ export function App() {
     }
   }
 
-  return (
-    <>
-      {renderCurrentStep()}
-    </>
-  )
+  return <>{renderCurrentStep()}</>
 }

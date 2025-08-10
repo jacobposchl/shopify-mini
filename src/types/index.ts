@@ -7,11 +7,14 @@ export interface Company {
   description: string
 }
 
+// add optional fields (non-breaking)
 export interface Style {
   id: string
   name: string
-  icon: string
-  description: string
+  icon?: string              // fallback emoji (optional)
+  iconUrl?: string           // image URL from imports
+  iconSelectedUrl?: string   // optional alt art for selected state
+  description?: string       // make optional to avoid required copy
 }
 
 export interface SubStyle {

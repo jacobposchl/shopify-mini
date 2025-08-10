@@ -1,81 +1,89 @@
-import { SubStyle } from '../types'
+import React from 'react'
+import type { SubStyle } from '../types'
 import { subStyles } from '../data/mockData'
 
 interface SubStyleSelectionProps {
   onSubStyleSelect: (subStyle: SubStyle) => void
   selectedSubStyle?: SubStyle
   selectedStyleId?: string
-  selectedCompanyName?: string
-  selectedStyleName?: string
+  selectedCompanyName?: string // kept for compatibility; not rendered
+  selectedStyleName?: string   // kept for compatibility; not rendered
+  onBack?: () => void
 }
 
-export function SubStyleSelection({ 
-  onSubStyleSelect, 
-  selectedSubStyle, 
+export function SubStyleSelection({
+  onSubStyleSelect,
+  selectedSubStyle,
   selectedStyleId,
-  selectedCompanyName,
-  selectedStyleName
+  onBack,
 }: SubStyleSelectionProps) {
-  // Filter sub-styles based on selected style
-  const availableSubStyles = subStyles.filter(subStyle => subStyle.styleId === selectedStyleId)
+  const options = React.useMemo(
+    () => subStyles.filter((s) => (selectedStyleId ? s.styleId === selectedStyleId : true)),
+    [selectedStyleId]
+  )
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="px-4 py-3">
-          <div className="flex items-center space-x-2 mb-1">
-            <span className="text-sm text-gray-500">{selectedCompanyName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm text-gray-500">{selectedStyleName}</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm font-medium text-blue-600">Step 3 of 6</span>
+    <div className="min-h-screen bg-[#550cff]">
+      {/* Header (Back absolute; centered; only Step shown) */}
+      <header className="relative bg-transparent">
+        {onBack && (
+          <button
+            onClick={onBack}
+            aria-label="Back"
+            className="absolute top-3 left-3 z-10 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/70 text-gray-900 hover:bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="text-sm">Back</span>
+          </button>
+        )}
+
+        <div className="px-4 pt-12 pb-4 text-center">
+          <div className="mb-1">
+            <span className="text-sm font-medium text-white">Step 3 of 6</span>
           </div>
-          <h1 className="text-xl font-bold text-gray-900">Choose Your Fit</h1>
-          <p className="text-sm text-gray-500">What specific style are you looking for?</p>
+          <h1 className="text-xl font-bold text-white">Choose Your Fit</h1>
+          <p className="text-sm text-white/80">Pick the specific style that matches what you want.</p>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="px-4 py-6">
-        <div className="grid grid-cols-1 gap-3">
-          {availableSubStyles.map((subStyle) => (
-            <button
-              key={subStyle.id}
-              onClick={() => onSubStyleSelect(subStyle)}
-              className={`bg-white rounded-lg shadow-sm p-4 transition-all text-left ${
-                selectedSubStyle?.id === subStyle.id
-                  ? 'ring-2 ring-blue-500 shadow-md'
-                  : 'hover:shadow-md'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-lg mb-1">
-                    {subStyle.name}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {subStyle.description}
-                  </p>
-                </div>
-                {selectedSubStyle?.id === subStyle.id && (
-                  <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
+        {options.length > 0 ? (
+          <div className="grid grid-cols-2 gap-4">
+            {options.map((opt) => {
+              const isSelected = selectedSubStyle?.id === opt.id
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => onSubStyleSelect(opt)}
+                  aria-pressed={isSelected}
+                  aria-label={`${opt.name}${isSelected ? ' selected' : ''}`}
+                  className={`bg-white rounded-lg overflow-hidden transition-all border focus:outline-none ${
+                    isSelected
+                      ? 'ring-2 ring-blue-500 border-blue-200 shadow-md'
+                      : 'border-gray-200 hover:shadow-md focus:ring-2 focus:ring-black/10'
+                  }`}
+                >
+                  <div className="p-6 text-center flex flex-col items-center">
+                    <h3 className="font-semibold text-gray-900 text-lg md:text-xl leading-tight mb-1">
+                      {opt.name}
+                    </h3>
+                    {opt.description ? (
+                      <p className="text-sm text-gray-500">{opt.description}</p>
+                    ) : null}
                   </div>
-                )}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* Continue Button */}
-        {selectedSubStyle && (
-          <div className="mt-8">
-            <button className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-              Continue with {selectedSubStyle.name}
-            </button>
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-12 text-white">
+            <svg className="mx-auto h-12 w-12 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium">No options found</h3>
+            <p className="mt-1 text-sm text-white/80">Try a different clothing type.</p>
           </div>
         )}
       </main>
