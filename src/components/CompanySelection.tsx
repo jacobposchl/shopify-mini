@@ -146,7 +146,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     return (
       <div key={company.id} className="relative aspect-square">
         <Card
-          className="relative w-full h-full p-0 overflow-hidden rounded-[22%] border-0 shadow-sm hover:scale-105 transition-transform"
+          className="relative w-full h-full p-0 overflow-hidden rounded-[22%] border-0 shadow-sm hover:scale-105 active:scale-95 transition-all duration-150 ease-out cursor-pointer"
           onClick={() => handleSelect(company)}
           aria-label={`${company.name}${isTrending ? `, trending #${rank + 1}` : ''}`}
         >

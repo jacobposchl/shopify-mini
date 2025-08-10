@@ -25,15 +25,12 @@ export function FinalRecommendation({
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-[#550cff] shadow-sm border-b border-gray-200">
         <div className="px-4 py-3">
           <div className="flex items-center space-x-2 mb-1">
-            <span className="text-sm font-medium text-green-600">Step 6 of 6</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm text-gray-500">Complete</span>
           </div>
-          <h1 className="text-xl font-bold text-gray-900">Your Perfect Fit</h1>
-          <p className="text-sm text-gray-500">Based on your preferences and measurements</p>
+          <h1 className="text-xl font-bold text-white">Your Perfect Fit</h1>
+          <p className="text-sm text-white/80">Based on your preferences and measurements</p>
         </div>
       </header>
 

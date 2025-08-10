@@ -331,7 +331,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
           </div>
         ) : (
           <div className="text-center py-8">
-            <div className="text-white/60 text-6xl mb-4">😕</div>
+
             <h3 className="text-lg font-medium text-white mb-2">No items found</h3>
                          <p className="text-white/80 mb-4">
                We couldn't find any items matching your exact criteria. This might be because the Shopify store doesn't have products matching your selections, or there might be a connection issue.
