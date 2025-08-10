@@ -300,11 +300,12 @@ export function MeasurementsStepImpl({
   const [debugEffectCount, setDebugEffectCount] = useState(0);
   const [debugAutoTrigger, setDebugAutoTrigger] = useState(false)
   const [debugError, setDebugError] = useState<string>('')
-
+  const [isPoseDetectionWaiting, setIsPoseDetectionWaiting] = useState(false)
   const [measurementBuffer, setMeasurementBuffer] = useState<Measurements[]>([])
-const [debugBufferSize, setDebugBufferSize] = useState(0)
-
+  const [debugBufferSize, setDebugBufferSize] = useState(0)
   const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null)
+  
 
 
   const {
@@ -1001,7 +1002,28 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
     })
   }, [poseResults, measurements, selectedStyleId])
 
-
+  const checkPoseDetectionStatus = useCallback(() => {
+    // Check if pose detection is currently loading
+    if (isPoseLoading) {
+      Logger.info('Pose detection is still loading...')
+      return 'loading'
+    }
+    
+    // Check if pose detection failed to initialize
+    if (poseError) {
+      Logger.warn('Pose detection has a real error:', poseError)
+      return 'error'
+    }
+    
+    // Check if pose detection is ready
+    if (isPoseInitialized) {
+      Logger.info('Pose detection is ready')
+      return 'ready'
+    }
+    
+    // Default state - not started yet
+    return 'not-started'
+  }, [isPoseLoading, poseError, isPoseInitialized])
 
   // Demo mode activation
   const enableDemoMode = useCallback(() => {
@@ -1172,18 +1194,28 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
         Logger.info('Pose detection started successfully')
       } catch (poseError) {
         const poseErrorMessage = (poseError as Error).message
-        Logger.warn('Pose detection failed, but camera is working', { 
-          error: poseErrorMessage,
-          stack: (poseError as Error).stack
+        Logger.warn('Pose detection initialization failed, checking status...', { 
+          error: poseErrorMessage
         })
-
-        // Don't fail completely if pose detection fails - camera is still working
-        // Just show a warning and continue with basic camera functionality
-        setCameraError(`Camera working but pose detection failed: ${poseErrorMessage}. You can still use manual measurements.`)
+      
+        // Check what's actually happening with pose detection
+        const poseStatus = checkPoseDetectionStatus()
         
-        // Don't enable demo mode immediately - let user see the camera feed
-        // They can manually enable demo mode if needed
-        return
+        if (poseStatus === 'loading') {
+          // Pose detection is still loading - this is not an error!
+          Logger.info('Pose detection is loading, showing loading state')
+          setIsPoseDetectionWaiting(true)
+          setCameraError('') // Clear any previous errors
+          
+          // Set up auto-retry when pose detection becomes ready
+          setupPoseDetectionRetry()
+          return
+        } else {
+          // This is a real error
+          Logger.error('Real pose detection error occurred')
+          setCameraError(`The camera will be used to calculate your measurements`)
+          return
+        }
       }
 
     } catch (error) {
@@ -1216,6 +1248,63 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
     }
   }, [syncCanvasToVideo, initializePose, startDetection, enableDemoMode])
 
+
+  const setupPoseDetectionRetry = useCallback(() => {
+    Logger.info('Setting up pose detection auto-retry...')
+    
+    // Clear any existing timer
+    if (retryTimerRef.current) {
+      clearInterval(retryTimerRef.current)
+    }
+    
+    const checkInterval = 500 // Check every 500ms
+    const maxRetries = 60 // Maximum 30 seconds
+    let retryCount = 0
+    
+    retryTimerRef.current = setInterval(async () => {
+      retryCount++
+      const poseStatus = checkPoseDetectionStatus()
+      
+      Logger.debug(`Pose detection retry ${retryCount}/${maxRetries}, status: ${poseStatus}`)
+      
+      if (poseStatus === 'ready' && videoRef.current) {
+        // Success - pose detection is ready
+        Logger.info('Pose detection became ready, attempting to start...')
+        
+        if (retryTimerRef.current) {
+          clearInterval(retryTimerRef.current)
+          retryTimerRef.current = null
+        }
+        
+        setIsPoseDetectionWaiting(false)
+        
+        try {
+          await startDetection()
+          Logger.info('Pose detection started successfully after retry')
+        } catch (retryError) {
+          Logger.error('Failed to start detection after retry:', retryError)
+          setCameraError('Pose detection failed to start. You can still use manual measurements.')
+        }
+        
+      } else if (poseStatus === 'error' || retryCount >= maxRetries) {
+        // Failure - real error or timeout
+        Logger.warn('Giving up on pose detection retry', { poseStatus, retryCount })
+        
+        if (retryTimerRef.current) {
+          clearInterval(retryTimerRef.current)
+          retryTimerRef.current = null
+        }
+        
+        setIsPoseDetectionWaiting(false)
+        
+        if (retryCount >= maxRetries) {
+          setCameraError('Pose detection is taking too long to load. You can still use manual measurements.')
+        } else {
+          setCameraError('Pose detection failed to initialize. You can still use manual measurements.')
+        }
+      }
+    }, checkInterval)
+  }, [checkPoseDetectionStatus, startDetection])
 
   const handleTakeMeasurement = () => {
     Logger.info('Taking measurement', {
@@ -1283,6 +1372,13 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
 
     return () => {
       Logger.info('Component unmounting, cleaning up camera and pose detection')
+
+      // Clear retry timer
+      if (retryTimerRef.current) {
+        clearInterval(retryTimerRef.current)
+        retryTimerRef.current = null
+      }
+      
       try {
         stopDetection()
       } catch (err) {
@@ -1345,6 +1441,21 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
     }
   }, [poseError])
 
+  // Add LoadingOverlay component definition here - BEFORE return statement
+  const LoadingOverlay = () => (
+    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+      <div className="bg-white bg-opacity-90 rounded-lg p-6 text-center shadow-lg">
+        <div className="flex items-center justify-center mb-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+          <span className="text-lg font-semibold text-gray-800">Loading pose detection...</span>
+        </div>
+        <p className="text-sm text-gray-600">
+          Initializing AI model for automatic measurements
+        </p>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen flex flex-col bg-black">
       {/* Header */}
@@ -1374,6 +1485,7 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
         </div>
       </header>
 
+      
       {/* Main content area */}
       <main className="relative flex-1 overflow-hidden">
         {/* Confidence Threshold Component - Top UI */}
@@ -1419,6 +1531,10 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
               className="absolute inset-0 pointer-events-none transform z-50"
               style={{ zIndex: 10, transformOrigin: 'center' }}
             />
+
+            {/* NEW: Add the loading overlay here */}
+            {isPoseDetectionWaiting && <LoadingOverlay />}
+
           </>
         )}
 
@@ -1428,27 +1544,21 @@ const [debugBufferSize, setDebugBufferSize] = useState(0)
         {cameraError && !isDemoMode && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 p-4">
             <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              <div className="w-16 h-16 mx-auto mb-4 bg-yellow-100 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Camera Issue</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Warning</h3>
               <p className="text-sm text-gray-600 mb-4">{cameraError}</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={retryCamera}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700"
-                >
-                  Try Again
-                </button>
-                <button
-                  onClick={enableDemoMode}
-                  className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200"
-                >
-                  Demo Mode
-                </button>
-              </div>
+                             <div className="flex gap-3">
+                 <button
+                   onClick={retryCamera}
+                   className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700"
+                 >
+                   Agree
+                 </button>
+               </div>
             </div>
           </div>
         )}
