@@ -79,75 +79,75 @@ export const companies: Company[] = [
   description: ''
 },
 {
-    id: 'test1',
-    name: 'test1',
-    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/f5/e8/6b/f5e86b54-5abc-248c-66c4-b3df20f8c691/AppIcon-0-0-1x_U007ephone-0-1-0-85-220.png/1200x600wa.png',
+    id: 'chanel',
+    name: 'chanel',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/5a/7e/f6/5a7ef697-c9ae-d796-9559-a745793c7a0d/prod-AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x630wa.png',
     description: ''
   },
   {
-    id: 'test2',
-    name: 'test2',
-    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/df/26/cf/df26cf2c-2980-1ebc-7354-064751cd3adc/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x630wa.png',
+    id: 'gucci',
+    name: 'gucci',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/3f/05/bc/3f05bc3a-645f-791d-e081-770ccaf9b791/AppIcon-0-0-1x_U007epad-0-1-0-85-220.png/1200x600wa.png',
     description: ''
   },
   {
-    id: 'test3',
-    name: 'test3',
-    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/8e/2e/f6/8e2ef607-663f-696f-d908-a54f0d5fdd5b/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
+    id: 'gap',
+    name: 'gap',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/60/f3/df/60f3df11-b5e8-2617-b8ca-8f82c207ec2b/AppIcon-Release-0-1x_U007emarketing-0-8-0-85-220-0.png/1200x630wa.png',
     description: ''
   },
   {
-    id: 'test4',
-    name: 'test4',
-    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/9b/21/95/9b2195e9-e161-270a-9a8f-da0e87c7a366/AppIcon-1x_U007emarketing-0-0-0-6-0-0-sRGB-85-220-0.png/1200x630wa.png',
+    id: 'fila',
+    name: 'fila',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/4e/4b/e8/4e4be84f-0901-540a-7b5e-b45a8dac191f/AppIcon-0-0-1x_U007emarketing-0-6-0-0-85-220.png/1200x630wa.png',
     description: ''
   },
   {
-    id: 'test5',
-    name: 'test5',
+    id: 'michael kors',
+    name: 'michael kors',
     logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/5c/fa/84/5cfa8485-4acd-7517-1234-413a6ce2a44f/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
     description: ''
   },
   {
-    id: 'test6',
-    name: 'test6',
-    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/44/02/c2/4402c2d0-c62f-b817-1287-63a91581c8dd/AppIcon-0-0-1x_U007emarketing-0-8-0-0-85-220.png/1200x600wa.png',
+    id: 'reebok',
+    name: 'reebok',
+    logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/35/0a/51/350a51a0-0b63-9bee-c03e-81d56a37766a/AppIcon-0-0-1x_U007emarketing-0-11-0-85-220.png/1200x630wa.png',
     description: ''
   },
   {
-  id: 'test7',
-  name: 'test7',
-  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/bc/14/53/bc14533c-6c03-9a99-abb9-54359823facf/AppIcon-0-0-1x_U007emarketing-0-6-0-85-220.png/1200x600wa.png',
+  id: 'zara',
+  name: 'zara',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/d6/06/df/d606df26-1d8d-846c-197b-586a2fa8ffba/AppIcon-0-0-1x_U007emarketing-0-8-0-sRGB-0-85-220.png/1200x630wa.png',
   description: ''
 },
 {
-  id: 'test8',
-  name: 'test8',
-  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/c5/72/6e/c5726e35-dbcb-dafe-b06b-c54382336487/AppIcon-0-0-1x_U007emarketing-0-7-0-85-220.png/1200x600wa.png',
+  id: 'kappa',
+  name: 'kappa',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/df/66/f7/df66f769-a953-ddb6-9144-3e64f39f2edf/AppIcon-0-0-1x_U007emarketing-0-11-0-85-220.png/1200x630wa.png',
   description: ''
 },
 {
-  id: 'test9',
-  name: 'test9',
-  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/3a/7c/7e/3a7c7eaa-8053-50f8-64c7-1ed637082d08/AppIcon-0-0-1x_U007epad-0-9-0-sRGB-85-220.png/1200x600wa.png',
+  id: 'arcteryx ',
+  name: 'arcteryx ',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/1b/6c/e5/1b6ce508-fee1-23ff-f723-ffdbe1b0ed00/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x630wa.png',
   description: ''
 },
 {
-  id: 'test10',
-  name: "test10",
-  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/7b/20/75/7b2075d9-7ece-fc25-0ce6-c626ecabd330/AppIcon-0-0-1x_U007emarketing-0-0-0-8-0-0-85-220.png/1200x630wa.png',
+  id: 'moncler',
+  name: "moncler",
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/4f/b4/4f/4fb44fe3-f449-b2a3-4737-c4312a6c9a88/AppIcon-0-0-1x_U007ephone-0-1-85-220.png/1200x630wa.png',
   description: ''
 },
 {
-  id: 'test11',
-  name: 'test11',
-  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/cc/04/49/cc044961-208f-cc09-5fde-18a1b6eef59b/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
+  id: 'vans',
+  name: 'vans',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/bf/d5/51/bfd5519a-3ad9-fb7e-0efc-906a646dc86e/AppIcon-0-0-1x_U007emarketing-0-11-0-85-220.png/1200x600wa.png',
   description: ''
 },
 {
-  id: 'test12',
-  name: 'test12',
-  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/97/af/0c/97af0cbc-725a-67e4-9c01-d6b542492b80/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x630wa.png',
+  id: 'ralph lauren',
+  name: 'ralph lauren',
+  logo: 'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/18/d8/dc/18d8dc29-081b-ae01-eaec-f39b4b9d2399/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/1200x600wa.png',
   description: ''
 }
 ]
