@@ -1,45 +1,8 @@
 // src/components/CompanySelection.tsx
 import React from 'react'
-import { Card, useAsyncStorage } from '@shopify/shop-minis-react'
+import { useAsyncStorage, MerchantCard } from '@shopify/shop-minis-react'
 import type { Company } from '../types'
-import { companies } from '../data/mockData'
-
-// ---------- helpers ----------
-function dailySeed(dateStr: string) {
-  let h = 0
-  for (let i = 0; i < dateStr.length; i++) h = (h * 31 + dateStr.charCodeAt(i)) >>> 0
-  return h
-}
-function pickDeterministic(
-  ids: string[],
-  n: number,
-  seed: number,
-  exclude = new Set<string>()
-) {
-  const pool = ids.filter((id) => !exclude.has(id))
-  const out: string[] = []
-  let s = seed
-  for (let i = 0; i < pool.length && out.length < n; i++) {
-    s = (s * 1664525 + 1013904223) >>> 0 // LCG
-    const idx = s % pool.length
-    const candidate = pool.splice(idx, 1)[0]
-    out.push(candidate)
-  }
-  return out
-}
-function chunk<T>(arr: T[], size: number) {
-  const res: T[][] = []
-  for (let i = 0; i < arr.length; i += size) res.push(arr.slice(i, i + size))
-  return res
-}
-function uniqById<T extends { id: string }>(arr: T[]) {
-  const seen = new Set<string>()
-  return arr.filter((item) => {
-    if (seen.has(item.id)) return false
-    seen.add(item.id)
-    return true
-  })
-}
+import { useShopDiscovery, type DiscoveredShop, ShopPriority } from '../hooks/useShopDiscovery'
 
 interface CompanySelectionProps {
   onCompanySelect: (company: Company) => void
@@ -48,125 +11,190 @@ interface CompanySelectionProps {
 
 export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
   const { getItem, setItem } = useAsyncStorage()
-  const [trendingIds, setTrendingIds] = React.useState<string[]>([])
+  const { 
+    shops: discoveredShops, 
+    groupedShops,
+    loading, 
+    followShop, 
+    unfollowShop, 
+    recordShopVisit,
+    userPreferences 
+  } = useShopDiscovery()
 
-  // De-dupe to avoid key collisions/gaps
-  const uniqueCompanies = React.useMemo(() => uniqById(companies), [])
-
-  // Stable original order for remaining brands
-  const originalIndex = React.useMemo(() => {
-    const m = new Map<string, number>()
-    uniqueCompanies.forEach((c, i) => m.set(c.id, i))
-    return m
-  }, [uniqueCompanies])
-
-  // Build today's top-3 (local clicks first, then daily rotation)
-  React.useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      const raw = await getItem({ key: 'brandClicks' })
-      let clicks: Record<string, number> = {}
-      try { clicks = raw ? JSON.parse(String(raw)) : {} } catch { clicks = {} }
-
-      const byClicks = Object.entries(clicks)
-        .sort((a, b) => b[1] - a[1])
-        .map(([id]) => id)
-        .filter((id) => uniqueCompanies.some((c) => c.id === id))
-        .slice(0, 3)
-
-      const need = 3 - byClicks.length
-      const today = new Date().toISOString().slice(0, 10)
-      const filler =
-        need > 0
-          ? pickDeterministic(
-              uniqueCompanies.map((c) => c.id),
-              need,
-              dailySeed(today),
-              new Set(byClicks)
-            )
-          : []
-
-      const todaysTop3 = [...byClicks, ...filler].slice(0, 3)
-      if (mounted) setTrendingIds(todaysTop3)
-    })()
-    return () => {
-      mounted = false
-    }
-  }, [getItem, uniqueCompanies])
-
-  // Rank lookup for medals
-  const rankById = React.useMemo(() => {
-    const m = new Map<string, number>()
-    trendingIds.forEach((id, i) => m.set(id, i)) // 0..2
-    return m
-  }, [trendingIds])
-
-  // Compose pages: page 1 = [Top3] + first six others; rest chunked by 9
-  const trendingCompanies = React.useMemo(
-    () =>
-      trendingIds
-        .map((id) => uniqueCompanies.find((c) => c.id === id))
-        .filter((c): c is Company => !!c),
-    [trendingIds, uniqueCompanies]
-  )
-  const otherCompanies = React.useMemo(
-    () =>
-      uniqueCompanies
-        .filter((c) => !rankById.has(c.id))
-        .sort(
-          (a, b) => (originalIndex.get(a.id)! - originalIndex.get(b.id)!)
-        ),
-    [uniqueCompanies, rankById, originalIndex]
-  )
-  const firstPage: Company[] = React.useMemo(
-    () => [...trendingCompanies, ...otherCompanies.slice(0, 6)],
-    [trendingCompanies, otherCompanies]
-  )
-  const remaining = React.useMemo(() => otherCompanies.slice(6), [otherCompanies])
-  const otherPages = React.useMemo(() => chunk(remaining, 9), [remaining])
-  const pages: Company[][] = React.useMemo(
-    () => [firstPage, ...otherPages],
-    [firstPage, otherPages]
-  )
-
-  const handleSelect = async (company: Company) => {
+  const handleSelect = async (shop: DiscoveredShop) => {
+    // Record the shop visit
+    await recordShopVisit(shop.id)
+    
+    // Record click for trending algorithm
     const raw = await getItem({ key: 'brandClicks' })
     let clicks: Record<string, number> = {}
     try { clicks = raw ? JSON.parse(String(raw)) : {} } catch { clicks = {} }
-    clicks[company.id] = (clicks[company.id] ?? 0) + 1
+    clicks[shop.id] = (clicks[shop.id] ?? 0) + 1
     await setItem({ key: 'brandClicks', value: JSON.stringify(clicks) })
-    onCompanySelect(company)
+    
+    // Call the original selection handler
+    onCompanySelect(shop)
   }
 
-  const medalForRank = (r: number) => (r === 0 ? '🥇' : r === 1 ? '🥈' : '🥉')
+  const handleFollowToggle = async (shop: DiscoveredShop, event: React.MouseEvent) => {
+    event.stopPropagation() // Prevent shop selection when clicking follow button
+    
+    if (userPreferences.followedShops.includes(shop.id)) {
+      await unfollowShop(shop.id)
+    } else {
+      await followShop(shop.id)
+    }
+  }
 
-  const renderCard = (company: Company) => {
-    const rank = rankById.has(company.id) ? (rankById.get(company.id) as number) : -1
-    const isTrending = rank !== -1
+  const getPriorityBadge = (priority: ShopPriority) => {
+    const badges = {
+      [ShopPriority.RECOMMENDED]: { text: '⭐', color: 'bg-yellow-500' },
+      [ShopPriority.FOLLOWED]: { text: '❤️', color: 'bg-red-500' },
+      [ShopPriority.RECENT]: { text: '🕒', color: 'bg-blue-500' },
+      [ShopPriority.POPULAR]: { text: '🔥', color: 'bg-orange-500' },
+      [ShopPriority.DISCOVERY]: { text: '✨', color: 'bg-purple-500' }
+    }
+    return badges[priority]
+  }
+
+  const getSectionTitle = (priority: ShopPriority) => {
+    const titles = {
+      [ShopPriority.RECOMMENDED]: '⭐ Recommended for You',
+      [ShopPriority.FOLLOWED]: '❤️ Shops You Follow',
+      [ShopPriority.RECENT]: '🕒 Recently Visited',
+      [ShopPriority.POPULAR]: '🔥 Trending Shops',
+      [ShopPriority.DISCOVERY]: '✨ Discover New Brands'
+    }
+    return titles[priority]
+  }
+
+  const renderCard = (shop: DiscoveredShop) => {
+    const isFollowed = userPreferences.followedShops.includes(shop.id)
+    const priorityBadge = getPriorityBadge(shop.priority)
+    
+    // Debug: Log what we're passing to MerchantCard
+    console.log(`🎯 Rendering shop card for ${shop.name}:`, {
+      id: shop.id,
+      name: shop.name,
+      logo: shop.logo,
+      priority: shop.priority
+    })
+    
     return (
-      <div key={company.id} className="relative aspect-square">
-        <Card
-          className="relative w-full h-full p-0 overflow-hidden rounded-[22%] border-0 shadow-sm hover:scale-105 active:scale-95 transition-all duration-150 ease-out cursor-pointer"
-          onClick={() => handleSelect(company)}
-          aria-label={`${company.name}${isTrending ? `, trending #${rank + 1}` : ''}`}
-        >
-          {isTrending && (
-            <div className="pointer-events-none absolute top-2 left-2 z-20">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/95 shadow ring-1 ring-black/5">
-                <span className="text-[18px]" aria-hidden>
-                  {medalForRank(rank)}
-                </span>
-                <span className="sr-only">Trending rank {rank + 1}</span>
-              </div>
+      <div key={shop.id} className="relative">
+        <div className="relative w-full">
+          <div onClick={() => handleSelect(shop)} className="cursor-pointer w-full hover:scale-105 active:scale-95 transition-all duration-300 ease-out">
+            <MerchantCard
+              shop={{
+                id: shop.id,
+                name: shop.name,
+                primaryDomain: { url: `https://${shop.name.toLowerCase().replace(/\s+/g, '')}.myshopify.com` },
+                reviewAnalytics: { averageRating: null, reviewCount: 0 }
+              }}
+            />
+          </div>
+          
+          {/* Priority Badge */}
+          <div className="pointer-events-none absolute top-3 right-3 z-20">
+            <div className={`flex items-center justify-center w-7 h-7 rounded-full ${priorityBadge.color} shadow-lg ring-2 ring-white/80`}>
+              <span className="text-sm" aria-hidden>
+                {priorityBadge.text}
+              </span>
+              <span className="sr-only">{shop.reason}</span>
             </div>
-          )}
-          <img
-            src={company.logo}
-            alt={company.name}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        </Card>
+          </div>
+
+          {/* Follow Button */}
+          <div className="absolute top-3 left-3 z-20">
+            <button
+              onClick={(e) => handleFollowToggle(shop, e)}
+              className={`flex items-center justify-center w-8 h-8 rounded-full shadow-lg ring-2 ring-white/80 transition-all duration-300 ${
+                isFollowed 
+                  ? 'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600' 
+                  : 'bg-white/90 hover:bg-white backdrop-blur-sm'
+              }`}
+              aria-label={isFollowed ? `Unfollow ${shop.name}` : `Follow ${shop.name}`}
+            >
+              <span className="text-sm">
+                {isFollowed ? '❤️' : '🤍'}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderSection = (priority: ShopPriority, shops: DiscoveredShop[]) => {
+    if (shops.length === 0) return null
+
+    return (
+      <section key={priority} className="mb-8">
+        <div className="px-4 mb-4">
+          <h2 className="text-lg font-bold text-white">{getSectionTitle(priority)}</h2>
+          <p className="text-sm text-white/70">{shops.length} shop{shops.length !== 1 ? 's' : ''}</p>
+        </div>
+        
+        <div className="px-4">
+          <div className="space-y-4">
+            {shops.map(renderCard)}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  // Loading state
+  if (loading && discoveredShops.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#550cff] flex flex-col">
+        <header className="relative bg-transparent">
+          <div className="px-4 pt-12 pb-4 text-center">
+            <div className="mb-1">
+              <span className="text-sm font-medium text-white">Step 1 of 6</span>
+            </div>
+            <h1 className="text-2xl font-extrabold text-white">Choose Your Brand</h1>
+            <p className="text-sm text-white/80">Discovering shops from Shopify...</p>
+          </div>
+        </header>
+        
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p>Loading shops from Shopify...</p>
+            <p className="text-sm opacity-80 mt-2">This may take a moment</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Empty state
+  if (!loading && discoveredShops.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#550cff] flex flex-col">
+        <header className="relative bg-transparent">
+          <div className="px-4 pt-12 pb-4 text-center">
+            <div className="mb-1">
+              <span className="text-sm font-medium text-white">Step 1 of 6</span>
+            </div>
+            <h1 className="text-2xl font-extrabold text-white">Choose Your Brand</h1>
+            <p className="text-sm text-white/80">No shops found</p>
+          </div>
+        </header>
+        
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-white text-center px-4">
+            <p className="text-lg mb-2">No shops available</p>
+            <p className="text-sm opacity-80">Unable to discover shops from Shopify at the moment</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -180,24 +208,22 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
             <span className="text-sm font-medium text-white">Step 1 of 6</span>
           </div>
           <h1 className="text-2xl font-extrabold text-white">Choose Your Brand</h1>
-          <p className="text-sm text-white/80">Trending Today</p>
+          <p className="text-sm text-white/80">
+            {loading ? 'Discovering shops from Shopify...' : `Found ${discoveredShops.length} shops from Shopify`}
+          </p>
         </div>
       </header>
 
-      {/* Snap scrolling with consistent spacing (no gaps) */}
-      <div className="flex-1 overflow-y-auto snap-y snap-mandatory scroll-py-4">
-        {pages.map((group, pageIdx) => (
-          <section key={pageIdx} className="snap-start h-full px-4 py-4">
-            <div className="grid grid-cols-3 gap-4">
-              {group.map(renderCard)}
-              {/* pad unfinished last page for perfect grid geometry */}
-              {group.length < 9 &&
-                Array.from({ length: 9 - group.length }).map((_, i) => (
-                  <div key={`spacer-${pageIdx}-${i}`} className="aspect-square" />
-                ))}
-            </div>
-          </section>
-        ))}
+      {/* Scrollable content with sections */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="py-4">
+          {/* Render each section in priority order */}
+          {renderSection(ShopPriority.RECOMMENDED, groupedShops[ShopPriority.RECOMMENDED])}
+          {renderSection(ShopPriority.FOLLOWED, groupedShops[ShopPriority.FOLLOWED])}
+          {renderSection(ShopPriority.RECENT, groupedShops[ShopPriority.RECENT])}
+          {renderSection(ShopPriority.POPULAR, groupedShops[ShopPriority.POPULAR])}
+          {renderSection(ShopPriority.DISCOVERY, groupedShops[ShopPriority.DISCOVERY])}
+        </div>
       </div>
     </div>
   )

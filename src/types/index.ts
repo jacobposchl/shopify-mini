@@ -7,6 +7,22 @@ export interface Company {
   description: string
 }
 
+// Shop discovery priority tiers
+export enum ShopPriority {
+  RECOMMENDED = 'RECOMMENDED',
+  FOLLOWED = 'FOLLOWED', 
+  RECENT = 'RECENT',
+  POPULAR = 'POPULAR',
+  DISCOVERY = 'DISCOVERY'
+}
+
+export interface DiscoveredShop extends Company {
+  priority: ShopPriority
+  reason: string
+  lastSeen?: Date
+  interactionCount?: number
+}
+
 // add optional fields (non-breaking)
 export interface Style {
   id: string
