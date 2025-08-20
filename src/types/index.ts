@@ -39,6 +39,7 @@ export interface ClothingItem {
   companyId: string
   styleId: string
   subStyleId: string
+  shopifyProduct?: any // Optional reference to original Shopify product data
 }
 
 // Pose detection results

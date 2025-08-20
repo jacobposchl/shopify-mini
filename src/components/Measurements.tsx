@@ -7,6 +7,7 @@ import { Logger } from '../utils/Logger'
 
 import { ConfidenceThreshold } from './ConfidenceThreshold'
 import { getClothingInstructions } from '../data/poseRequirements'
+import { BackButton } from './BackButton'
 
 // Error boundary component
 class InAppErrorBoundary extends React.Component<
@@ -1249,16 +1250,9 @@ export function MeasurementsStepImpl({
     <div className="min-h-screen flex flex-col bg-[#550cff]">
       {/* Themed header (matches steps 2/3): back button in top-left, centered step/title/subtitle */}
       <header className="relative bg-transparent">
-        <button
-          onClick={onCancel}
-          aria-label="Back"
-          className="absolute top-3 left-3 z-10 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/70 text-gray-900 hover:bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="text-sm">Back</span>
-        </button>
+        <div className="absolute top-3 left-3 z-10">
+          <BackButton onClick={onCancel} />
+        </div>
 
         <div className="px-4 pt-12 pb-4 text-center">
           <div className="mb-1">

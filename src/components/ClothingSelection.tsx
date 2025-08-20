@@ -1,151 +1,366 @@
-// src/components/ClothingSelection.tsx
-import React from 'react'
-import type { ClothingItem } from '../types'
-import { clothingItems } from '../data/mockData'
+
+import { useState, useMemo } from 'react'
+import { useProductSearch } from '@shopify/shop-minis-react'
+import { BackButton } from './BackButton'
+import { ProductImage } from './ProductImage'
+import type { ClothingItem, Company, Style, SubStyle } from '../types'
+import type { ProductFilters, ProductSearchSortBy } from '@shopify/shop-minis-react'
 
 interface ClothingSelectionProps {
+  onBack: () => void
   onItemSelect: (item: ClothingItem) => void
-  selectedItem?: ClothingItem
-  selectedCompanyId?: string
-  selectedStyleId?: string
-  selectedSubStyleId?: string
-  selectedCompanyName?: string
-  selectedStyleName?: string
-  selectedSubStyleName?: string
-  onBack?: () => void // optional, if you use a back button pattern elsewhere
+  selectedCompany?: Company
+  selectedStyle?: Style
+  selectedSubStyle?: SubStyle
 }
 
-export function ClothingSelection({
-  onItemSelect,
-  selectedItem,
-  selectedCompanyId,
-  selectedStyleId,
-  selectedSubStyleId,
-  selectedCompanyName,
-  selectedStyleName,
-  selectedSubStyleName,
-  onBack,
-}: ClothingSelectionProps) {
-  // Filter items based on selections
-  const filteredItems = clothingItems.filter((item) => {
-    const matchesCompany = selectedCompanyId ? item.companyId === selectedCompanyId : true
-    const matchesStyle = selectedStyleId ? item.styleId === selectedStyleId : true
-    const matchesSubStyle = selectedSubStyleId ? item.subStyleId === selectedSubStyleId : true
-    return matchesCompany && matchesStyle && matchesSubStyle
+export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selectedStyle, selectedSubStyle }: ClothingSelectionProps) {
+  const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null)
+  
+  // Get user selections from previous steps (now passed as props)
+  const company = selectedCompany
+  const style = selectedStyle
+  const subStyle = selectedSubStyle
+  
+  // Build search query and filters for Shopify
+  const searchQuery = useMemo(() => {
+    const terms = []
+    if (company?.name) terms.push(company.name)
+    if (style?.name) terms.push(style.name)
+    if (subStyle?.name) terms.push(subStyle.name)
+    
+    if (terms.length === 0) {
+      return 'clothing apparel'
+    }
+    
+    return terms.join(' ')
+  }, [company?.name, style?.name, subStyle?.name])
+
+  // Ensure we have a valid search query
+  const finalSearchQuery = searchQuery.trim() || 'clothing apparel'
+
+  const filters: ProductFilters = useMemo(() => {
+    const filters: ProductFilters = {}
+    
+    // Only add category filter if we have a style - keep it simple
+    if (style?.name) {
+      // Use a single item array for now
+      filters.category = [style.name.toLowerCase()]
+    }
+    
+    // Skip gender filter for now to test basic functionality
+    // We can add it back once we confirm the basic search works
+    
+    return filters
+  }, [style?.name])
+
+  // Use the official Shopify Minis SDK hook
+  const { products: shopifyProducts, loading, error } = useProductSearch({
+    query: finalSearchQuery,
+    // Temporarily disable filters to test basic search
+    // filters,
+    sortBy: 'RELEVANCE' as ProductSearchSortBy,
+    first: 50,
+    includeSensitive: false
   })
 
-  const displayItems = filteredItems.length > 0 ? filteredItems : clothingItems
+  // Debug logging for troubleshooting
+  console.log('ClothingSelection - useProductSearch params:', {
+    query: finalSearchQuery,
+    filters,
+    sortBy: 'RELEVANCE',
+    first: 50,
+    includeSensitive: false
+  })
+  
+  console.log('ClothingSelection - Filter details:', {
+    filtersObject: filters,
+    filtersKeys: Object.keys(filters),
+    filtersValues: Object.values(filters),
+    filtersStringified: JSON.stringify(filters),
+    styleName: style?.name,
+    styleId: style?.id
+  })
+  
+  console.log('ClothingSelection - useProductSearch result:', {
+    products: shopifyProducts,
+    loading,
+    error,
+    productsCount: shopifyProducts?.length || 0
+  })
 
+  // Transform Shopify products to our ClothingItem format
+  const products: ClothingItem[] = useMemo(() => {
+    if (!shopifyProducts) return []
+    
+    return shopifyProducts.map((product) => ({
+      id: product.id,
+      name: product.title,
+      brand: product.shop.name,
+      style: style?.name || 'Unknown',
+      subStyle: subStyle?.name || 'Unknown',
+      price: product.price.amount ? `${product.price.currencyCode} ${product.price.amount}` : 'Price not available',
+      image: product.featuredImage?.url || '',
+      colors: [], // Extract from variants if available
+      sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], // Default sizes for now
+      companyId: product.shop.id,
+      styleId: style?.id || '',
+      subStyleId: subStyle?.id || '',
+      shopifyProduct: product // Keep reference to original Shopify data
+    }))
+  }, [shopifyProducts, style?.name, style?.id, subStyle?.name, subStyle?.id])
+
+  const isLoading = loading
+  const useMockData = false // We're using real Shopify data now
+  
+  // Helper function to get match quality indicator
+  const getMatchQuality = () => {
+    if (!company || !style || !subStyle) return 'all'
+    
+    const exactMatches = products.filter(product => 
+      product.brand === company.name &&
+      product.style === style.name &&
+      product.subStyle === subStyle.name
+    )
+    
+    if (exactMatches.length > 0) return 'exact'
+    
+    const partialMatches = products.filter(product => {
+      let score = 0
+      if (product.brand === company.name) score++
+      if (product.style === style.name) score++
+      if (product.subStyle === subStyle.name) score++
+      return score >= 2
+    })
+    
+    if (partialMatches.length > 0) return 'partial'
+    return 'fallback'
+  }
+  
+  const matchQuality = getMatchQuality()
+  
+  // Helper function to build search query display (now uses the same logic as the actual search)
+  const getSearchQueryDisplay = () => finalSearchQuery
+  
+  const handleItemSelect = (item: ClothingItem) => {
+    setSelectedItem(item)
+  }
+  
+  const handleContinue = () => {
+    if (selectedItem) {
+      // Call the parent's onItemSelect to handle the selection
+      onItemSelect(selectedItem)
+    }
+  }
+
+  const handleBack = () => {
+    onBack()
+  }
+  
+
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-md mx-auto">
+          <BackButton onClick={handleBack} />
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Finding perfect items for you...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-md mx-auto">
+          <BackButton onClick={handleBack} />
+          <div className="text-center py-8">
+            <div className="text-red-500 text-6xl mb-4">⚠️</div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Oops! Something went wrong</h2>
+            <p className="text-gray-600 mb-4">We couldn't load the products right now.</p>
+            
+            {/* Show detailed error information for debugging */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-left">
+                <p className="text-sm font-medium text-red-800 mb-2">Error Details:</p>
+                <pre className="text-xs text-red-600 whitespace-pre-wrap break-words">
+                  {JSON.stringify(error, null, 2)}
+                </pre>
+              </div>
+            )}
+            
+            {/* Show search parameters for debugging */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-left">
+              <p className="text-sm font-medium text-gray-800 mb-2">Search Parameters:</p>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p>Query: "{finalSearchQuery}"</p>
+                <p>Filters: {JSON.stringify(filters)}</p>
+                <p>Company: {company?.name || 'undefined'}</p>
+                <p>Style: {style?.name || 'undefined'}</p>
+                <p>SubStyle: {subStyle?.name || 'undefined'}</p>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  
   return (
     <div className="min-h-screen bg-[#550cff]">
-      {/* Header to match other steps */}
-      <header className="relative bg-transparent">
-        {onBack && (
-          <button
-            onClick={onBack}
-            aria-label="Back"
-            className="absolute top-3 left-3 z-10 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/70 text-gray-900 hover:bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span className="text-sm">Back</span>
-          </button>
-        )}
+      <div className="max-w-md mx-auto p-4">
+        <BackButton onClick={handleBack} />
+        
+        {/* Header with selection summary */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-white mb-2">Step 4: Choose Your Items</h1>
 
-        <div className="px-4 pt-12 pb-4 text-center">
-          <div className="mb-1">
-            <span className="text-sm font-medium text-white">Step 4 of 6</span>
+          
+          
+          
+          
+          
+          {/* Search query and filters display */}
+          <div className="space-y-2 mb-4">
+            <div className="text-center space-y-1">
+                             {style?.name && (
+                 <div className="text-xs text-white/80">
+                   Category: {style.name} • Gender: {style.name.toLowerCase().includes('dress') || style.name.toLowerCase().includes('suit') ? 'Male' : style.name.toLowerCase().includes('dress') || style.name.toLowerCase().includes('skirt') ? 'Female' : 'Neutral'}
+                 </div>
+               )}
+               {/* Show when using fallback products */}
+               {!shopifyProducts && (
+                 <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+                   No products found from main search
+                 </div>
+               )}
+            </div>
+            
           </div>
-          <h1 className="text-2xl font-extrabold text-white">Choose Your Item</h1>
-          <p className="text-sm text-white/80">Select the perfect item for you</p>
         </div>
-      </header>
-
-      {/* Main */}
-      <main className="px-4 py-6">
-        {displayItems.length > 0 ? (
-          <div className="space-y-4">
-            {displayItems.map((item) => {
+        
+        {/* Products count */}
+        <div className="mb-4">
+          <p className="text-sm text-white/80 text-center">
+            {products.length} item{products.length !== 1 ? 's' : ''} available
+          </p>
+        </div>
+        
+        {/* Products grid */}
+        {products.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            {products.map((item) => {
               const isSelected = selectedItem?.id === item.id
+              const isExactMatch = company && style && subStyle && 
+                item.brand === company.name &&
+                item.style === style.name &&
+                item.subStyle === subStyle.name
+              
               return (
-                <button
+                <div
                   key={item.id}
-                  onClick={() => onItemSelect(item)}
-                  className={`w-full rounded-xl overflow-hidden bg-white transition-all ${
-                    isSelected ? 'ring-2 ring-blue-500 shadow-md' : 'shadow-sm hover:shadow-md'
+                  className={`relative bg-white rounded-lg p-3 cursor-pointer transition-all duration-200 ${
+                    isSelected 
+                      ? 'ring-2 ring-blue-500 shadow-lg scale-105' 
+                      : 'hover:shadow-md hover:scale-102'
                   }`}
-                  aria-pressed={isSelected}
+                  onClick={() => handleItemSelect(item)}
                 >
-                  {/* Grid ensures the media column stretches to card height */}
-                  <div className="grid grid-cols-[96px_1fr]">
-                    {/* Media column: full-height, no white gap */}
-                    <div className="relative h-full">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        loading="lazy"
-                      />
+                  {/* Exact match indicator */}
+                  {isExactMatch && (
+                    <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                      Perfect Match
                     </div>
-
-                    {/* Content */}
-                    <div className="p-4 text-left">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900 text-base mb-1">
-                            {item.name}
-                          </h3>
-                          <p className="text-2xl font-bold text-gray-900 mb-2">
-                            {item.price}
-                          </p>
-
-                          {/* Colors + sizes row */}
-                          <div className="flex items-center flex-wrap gap-2 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              {item.colors.slice(0, 3).map((color, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-block w-3 h-3 rounded-full border border-gray-200"
-                                  style={{ backgroundColor: color.toLowerCase() }}
-                                />
-                              ))}
-                              {item.colors.length > 3 && (
-                                <span className="text-xs text-gray-500">+{item.colors.length - 3}</span>
-                              )}
-                            </div>
-                            <span className="text-gray-400">•</span>
-                            <span className="text-xs text-gray-500">{item.sizes.join(', ')}</span>
-                          </div>
-                        </div>
-
-                        {isSelected && (
-                          <div className="ml-3 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path
-                                fillRule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          </div>
-                        )}
+                  )}
+                  
+                  {/* Product image */}
+                  <div className="aspect-square mb-3 rounded-md overflow-hidden bg-gray-100">
+                    {item.image ? (
+                      <ProductImage src={item.image} alt={item.name} className="w-full h-full" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <span className="text-2xl">👕</span>
                       </div>
+                    )}
+                  </div>
+                  
+                  {/* Product info */}
+                  <div className="space-y-1">
+                    <h3 className="font-medium text-gray-800 text-sm line-clamp-2">
+                      {item.name}
+                    </h3>
+                    <p className="text-gray-600 text-xs">{item.brand}</p>
+                    <p className="font-semibold text-blue-600 text-sm">{item.price}</p>
+                    
+                    {/* Sizes and colors */}
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {item.sizes.slice(0, 3).map((size, index) => (
+                        <span
+                          key={index}
+                          className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded"
+                        >
+                          {size}
+                        </span>
+                      ))}
+                      {item.sizes.length > 3 && (
+                        <span className="text-xs text-gray-500">+{item.sizes.length - 3}</span>
+                      )}
                     </div>
                   </div>
-                </button>
+                  
+                  {/* Selection indicator */}
+                  {isSelected && (
+                    <div className="absolute top-2 left-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
+                      <span className="text-xs">✓</span>
+                    </div>
+                  )}
+                </div>
               )
             })}
           </div>
         ) : (
-          <div className="text-center py-12 text-white/90">
-            <h3 className="mt-2 text-sm font-medium">No items found</h3>
-            <p className="mt-1 text-sm opacity-80">
-              Try adjusting your selections to find more options.
-            </p>
+          <div className="text-center py-8">
+
+            <h3 className="text-lg font-medium text-white mb-2">No items found</h3>
+                         <p className="text-white/80 mb-4">
+               We couldn't find any items matching your exact criteria. This might be because the Shopify store doesn't have products matching your selections, or there might be a connection issue.
+             </p>
+            <button
+              onClick={handleBack}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Adjust Selections
+            </button>
           </div>
         )}
-      </main>
+        
+        {/* Continue button */}
+        {selectedItem && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
+            <div className="max-w-md mx-auto">
+              <button
+                onClick={handleContinue}
+                className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              >
+                                 Continue
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
+
+

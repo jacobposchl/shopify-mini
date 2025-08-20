@@ -6,7 +6,7 @@ import { SubStyleSelection } from './components/SubStyleSelection'
 import { ClothingSelection } from './components/ClothingSelection'
 import { MeasurementsStep } from './components/Measurements'
 import { FinalRecommendation } from './components/FinalRecommendation'
-import { clothingItems } from './data/mockData'
+
 
 export function App() {
   const {
@@ -20,6 +20,8 @@ export function App() {
     goToNextStep,
     goToPreviousStep
   } = useFlowState()
+
+  // ClothingSelection now uses useProductSearch directly, so no need for this hook here
 
   const handleBack = () => {
     goToPreviousStep()
@@ -41,10 +43,11 @@ export function App() {
   }
 
   const handleItemSelect = (item: any) => {
-    const selectedItem = clothingItems.find(clothingItem => clothingItem.id === item.id)
-    if (selectedItem) {
+    // The item is now passed directly from ClothingSelection component
+    // which uses useProductSearch and transforms the data to our ClothingItem format
+    if (item) {
       setRecommendations([{
-        item: selectedItem,
+        item: item,
         recommendedSize: 'M',
         confidence: 0.8,
         measurements: flowState.measurements || {
@@ -108,8 +111,6 @@ export function App() {
             onSubStyleSelect={handleSubStyleSelect}
             selectedSubStyle={flowState.userPreferences.selectedSubStyle}
             selectedStyleId={flowState.userPreferences.selectedStyle?.id}
-            selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
-            selectedStyleName={flowState.userPreferences.selectedStyle?.name}
             onBack={handleBack}
           />
         )
@@ -117,15 +118,11 @@ export function App() {
       case 'clothing-selection':
         return (
           <ClothingSelection
-            onItemSelect={handleItemSelect}
-            selectedItem={flowState.recommendations?.[0]?.item}
-            selectedCompanyId={flowState.userPreferences.selectedCompany?.id}
-            selectedStyleId={flowState.userPreferences.selectedStyle?.id}
-            selectedSubStyleId={flowState.userPreferences.selectedSubStyle?.id}
-            selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
-            selectedStyleName={flowState.userPreferences.selectedStyle?.name}
-            selectedSubStyleName={flowState.userPreferences.selectedSubStyle?.name}
             onBack={handleBack}
+            onItemSelect={handleItemSelect}
+            selectedCompany={flowState.userPreferences.selectedCompany}
+            selectedStyle={flowState.userPreferences.selectedStyle}
+            selectedSubStyle={flowState.userPreferences.selectedSubStyle}
           />
         )
 
