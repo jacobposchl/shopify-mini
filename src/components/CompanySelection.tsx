@@ -1,6 +1,6 @@
 // src/components/CompanySelection.tsx
-import React from 'react'
-import { useAsyncStorage, MerchantCard } from '@shopify/shop-minis-react'
+import React, { useState, useMemo } from 'react'
+import { useAsyncStorage } from '@shopify/shop-minis-react'
 import type { Company } from '../types'
 import { useShopDiscovery, type DiscoveredShop, ShopPriority } from '../hooks/useShopDiscovery'
 
@@ -11,15 +11,43 @@ interface CompanySelectionProps {
 
 export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
   const { getItem, setItem } = useAsyncStorage()
-  const { 
-    shops: discoveredShops, 
+  const [searchQuery, setSearchQuery] = useState('')
+  const {
+    shops: discoveredShops,
     groupedShops,
-    loading, 
-    followShop, 
-    unfollowShop, 
+    loading,
+    followShop,
+    unfollowShop,
     recordShopVisit,
-    userPreferences 
+    userPreferences
   } = useShopDiscovery()
+
+  // Filter shops based on search query
+  const filteredShops = useMemo(() => {
+    if (!searchQuery.trim()) return discoveredShops
+    
+    const query = searchQuery.toLowerCase()
+    return discoveredShops.filter(shop =>
+      shop.name.toLowerCase().includes(query)
+    )
+  }, [discoveredShops, searchQuery])
+
+  // Group filtered shops by priority for display
+  const filteredGroupedShops = useMemo(() => {
+    const grouped = {
+      [ShopPriority.RECOMMENDED]: [] as DiscoveredShop[],
+      [ShopPriority.FOLLOWED]: [] as DiscoveredShop[],
+      [ShopPriority.RECENT]: [] as DiscoveredShop[],
+      [ShopPriority.POPULAR]: [] as DiscoveredShop[],
+      [ShopPriority.DISCOVERY]: [] as DiscoveredShop[]
+    }
+    
+    filteredShops.forEach(shop => {
+      grouped[shop.priority].push(shop)
+    })
+    
+    return grouped
+  }, [filteredShops])
 
   const handleSelect = async (shop: DiscoveredShop) => {
     // Record the shop visit
@@ -46,64 +74,55 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     }
   }
 
-  const getPriorityBadge = (priority: ShopPriority) => {
-    const badges = {
-      [ShopPriority.RECOMMENDED]: { text: '⭐', color: 'bg-yellow-500' },
-      [ShopPriority.FOLLOWED]: { text: '❤️', color: 'bg-red-500' },
-      [ShopPriority.RECENT]: { text: '🕒', color: 'bg-blue-500' },
-      [ShopPriority.POPULAR]: { text: '🔥', color: 'bg-orange-500' },
-      [ShopPriority.DISCOVERY]: { text: '✨', color: 'bg-purple-500' }
-    }
-    return badges[priority]
-  }
-
   const getSectionTitle = (priority: ShopPriority) => {
     const titles = {
-      [ShopPriority.RECOMMENDED]: '⭐ Recommended for You',
-      [ShopPriority.FOLLOWED]: '❤️ Shops You Follow',
-      [ShopPriority.RECENT]: '🕒 Recently Visited',
-      [ShopPriority.POPULAR]: '🔥 Trending Shops',
-      [ShopPriority.DISCOVERY]: '✨ Discover New Brands'
+      [ShopPriority.RECOMMENDED]: 'Recommended for You',
+      [ShopPriority.FOLLOWED]: 'Shops You Follow',
+      [ShopPriority.RECENT]: 'Recently Visited',
+      [ShopPriority.POPULAR]: 'Trending Shops',
+      [ShopPriority.DISCOVERY]: 'Discover New Brands'
     }
     return titles[priority]
   }
 
   const renderCard = (shop: DiscoveredShop) => {
     const isFollowed = userPreferences.followedShops.includes(shop.id)
-    const priorityBadge = getPriorityBadge(shop.priority)
-    
-    // Debug: Log what we're passing to MerchantCard
-    console.log(`🎯 Rendering shop card for ${shop.name}:`, {
-      id: shop.id,
-      name: shop.name,
-      logo: shop.logo,
-      priority: shop.priority
-    })
     
     return (
       <div key={shop.id} className="relative">
         <div className="relative w-full">
           <div onClick={() => handleSelect(shop)} className="cursor-pointer w-full hover:scale-105 active:scale-95 transition-all duration-300 ease-out">
-            <MerchantCard
-              shop={{
-                id: shop.id,
-                name: shop.name,
-                primaryDomain: { url: `https://${shop.name.toLowerCase().replace(/\s+/g, '')}.myshopify.com` },
-                reviewAnalytics: { averageRating: null, reviewCount: 0 }
-              }}
-            />
-          </div>
-          
-          {/* Priority Badge */}
-          <div className="pointer-events-none absolute top-3 right-3 z-20">
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full ${priorityBadge.color} shadow-lg ring-2 ring-white/80`}>
-              <span className="text-sm" aria-hidden>
-                {priorityBadge.text}
-              </span>
-              <span className="sr-only">{shop.reason}</span>
+            {/* Custom Shop Card - Guaranteed to show images */}
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border-0 max-w-sm">
+              {/* Shop Image */}
+              <div className="relative w-full aspect-[2/1] bg-gradient-to-br from-gray-50 to-gray-100">
+                {shop.logo ? (
+                  <img
+                    src={shop.logo}
+                    alt={`${shop.name} logo`}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-10 h-10 mx-auto mb-1 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                        <span className="text-lg text-white font-bold">{shop.name.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <p className="text-gray-600 text-xs font-medium">{shop.name}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Shop Info */}
+              <div className="p-3">
+                <h3 className="font-semibold text-gray-900 text-base mb-1">{shop.name}</h3>
+                <p className="text-gray-600 text-xs">{shop.reason}</p>
+              </div>
             </div>
           </div>
-
+          
           {/* Follow Button */}
           <div className="absolute top-3 left-3 z-20">
             <button
@@ -131,7 +150,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     return (
       <section key={priority} className="mb-8">
         <div className="px-4 mb-4">
-          <h2 className="text-lg font-bold text-white">{getSectionTitle(priority)}</h2>
+          <h2 className="text-xl font-bold text-white">{getSectionTitle(priority)}</h2>
           <p className="text-sm text-white/70">{shops.length} shop{shops.length !== 1 ? 's' : ''}</p>
         </div>
         
@@ -205,12 +224,36 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
       <header className="relative bg-transparent">
         <div className="px-4 pt-12 pb-4 text-center">
           <div className="mb-1">
-            <span className="text-sm font-medium text-white">Step 1 of 6</span>
+            <span className="text-base font-medium text-white">Step 1 of 6</span>
           </div>
-          <h1 className="text-2xl font-extrabold text-white">Choose Your Brand</h1>
-          <p className="text-sm text-white/80">
-            {loading ? 'Discovering shops from Shopify...' : `Found ${discoveredShops.length} shops from Shopify`}
-          </p>
+          <h1 className="text-3xl font-extrabold text-white">Select Shop</h1>
+        </div>
+        
+        {/* Search Bar */}
+        <div className="px-4 mb-6">
+          <div className="relative max-w-md mx-auto">
+            <input
+              type="text"
+              placeholder="Search for specific brands..."
+              className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/40 focus:bg-white/20 transition-all duration-200"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+          
+          {/* Search Results Indicator */}
+          {searchQuery.trim() && (
+            <div className="text-center mt-2">
+              <span className="text-white/80 text-sm">
+                {filteredShops.length} shop{filteredShops.length !== 1 ? 's' : ''} found for "{searchQuery}"
+              </span>
+            </div>
+          )}
         </div>
       </header>
 
@@ -218,11 +261,11 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
       <div className="flex-1 overflow-y-auto">
         <div className="py-4">
           {/* Render each section in priority order */}
-          {renderSection(ShopPriority.RECOMMENDED, groupedShops[ShopPriority.RECOMMENDED])}
-          {renderSection(ShopPriority.FOLLOWED, groupedShops[ShopPriority.FOLLOWED])}
-          {renderSection(ShopPriority.RECENT, groupedShops[ShopPriority.RECENT])}
-          {renderSection(ShopPriority.POPULAR, groupedShops[ShopPriority.POPULAR])}
-          {renderSection(ShopPriority.DISCOVERY, groupedShops[ShopPriority.DISCOVERY])}
+          {renderSection(ShopPriority.RECOMMENDED, filteredGroupedShops[ShopPriority.RECOMMENDED])}
+          {renderSection(ShopPriority.FOLLOWED, filteredGroupedShops[ShopPriority.FOLLOWED])}
+          {renderSection(ShopPriority.RECENT, filteredGroupedShops[ShopPriority.RECENT])}
+          {renderSection(ShopPriority.POPULAR, filteredGroupedShops[ShopPriority.POPULAR])}
+          {renderSection(ShopPriority.DISCOVERY, filteredGroupedShops[ShopPriority.DISCOVERY])}
         </div>
       </div>
     </div>
