@@ -1,6 +1,6 @@
 // src/components/CompanySelection.tsx
-import React, { useState, useMemo } from 'react'
-import { useAsyncStorage } from '@shopify/shop-minis-react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { useAsyncStorage, useProductSearch } from '@shopify/shop-minis-react'
 import type { Company } from '../types'
 import { useShopDiscovery, type DiscoveredShop, ShopPriority } from '../hooks/useShopDiscovery'
 
@@ -12,6 +12,9 @@ interface CompanySelectionProps {
 export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
   const { getItem, setItem } = useAsyncStorage()
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [hasError, setHasError] = useState(false)
+  
   const {
     shops: discoveredShops,
     groupedShops,
@@ -22,32 +25,153 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     userPreferences
   } = useShopDiscovery()
 
-  // Filter shops based on search query
-  const filteredShops = useMemo(() => {
-    if (!searchQuery.trim()) return discoveredShops
-    
-    const query = searchQuery.toLowerCase()
-    return discoveredShops.filter(shop =>
-      shop.name.toLowerCase().includes(query)
+  // Error boundary - if anything crashes, show fallback
+  if (hasError) {
+    return (
+      <div className="min-h-screen bg-[#550cff] flex flex-col items-center justify-center">
+        <div className="text-white text-center">
+          <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
+          <p className="mb-4">The shop selection encountered an error</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
     )
-  }, [discoveredShops, searchQuery])
+  }
+
+  // Debounce user input for better performance
+  useEffect(() => {
+    try {
+      const timer = setTimeout(() => {
+        setDebouncedQuery(searchQuery)
+      }, 300)
+      
+      return () => clearTimeout(timer)
+    } catch (error) {
+      console.error('Error in debounce effect:', error)
+      setHasError(true)
+    }
+  }, [searchQuery])
+
+  // Real-time shop search using SDK
+  const { products: searchProducts, loading: searchLoading, error: searchError } = useProductSearch({
+    query: debouncedQuery ? `${debouncedQuery} fashion clothing apparel` : 'fashion clothing',
+    first: 100,
+    includeSensitive: false
+  })
+
+  // Extract and filter fashion shops from search results
+  const searchShops = useMemo(() => {
+    try {
+      if (!searchProducts || !debouncedQuery.trim()) return []
+      
+      const shopMap = new Map<string, DiscoveredShop>()
+      
+      searchProducts.forEach(product => {
+        try {
+          const shopId = product.shop?.id
+          const shopName = product.shop?.name
+          
+          if (!shopId || !shopName) return
+          
+          // Only include fashion-related shops
+          const isFashionShop = isFashionRelated(product, shopName.toLowerCase())
+          if (!isFashionShop) return
+          
+          if (!shopMap.has(shopId)) {
+            shopMap.set(shopId, {
+              id: shopId,
+              name: shopName,
+              logo: product.featuredImage?.url || '',
+              description: `Found via search: ${debouncedQuery}`,
+              priority: ShopPriority.DISCOVERY,
+              reason: 'Search result'
+            })
+          }
+        } catch (productError) {
+          console.error('Error processing product:', productError)
+        }
+      })
+      
+      // Return shops sorted by name for consistency
+      return Array.from(shopMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+    } catch (error) {
+      console.error('Error in searchShops:', error)
+      return []
+    }
+  }, [searchProducts, debouncedQuery])
+
+  // Helper function to filter fashion-only shops
+  const isFashionRelated = (product: any, shopName: string) => {
+    const fashionKeywords = [
+      'clothing', 'fashion', 'apparel', 'wear', 'style', 'outfit',
+      'dress', 'shirt', 'pants', 'shoes', 'accessories', 'jewelry',
+      'bag', 'purse', 'hat', 'scarf', 'belt', 'watch'
+    ]
+    
+    const productTitle = product.title?.toLowerCase() || ''
+    const productTags = product.tags?.map((tag: string) => tag.toLowerCase()) || []
+    
+    // Check if shop name contains fashion keywords
+    const shopIsFashion = fashionKeywords.some(keyword => shopName.includes(keyword))
+    
+    // Check if product title contains fashion keywords
+    const productIsFashion = fashionKeywords.some(keyword => 
+      productTitle.includes(keyword) || productTags.includes(keyword)
+    )
+    
+    return shopIsFashion || productIsFashion
+  }
 
   // Group filtered shops by priority for display
   const filteredGroupedShops = useMemo(() => {
-    const grouped = {
-      [ShopPriority.RECOMMENDED]: [] as DiscoveredShop[],
-      [ShopPriority.FOLLOWED]: [] as DiscoveredShop[],
-      [ShopPriority.RECENT]: [] as DiscoveredShop[],
-      [ShopPriority.POPULAR]: [] as DiscoveredShop[],
-      [ShopPriority.DISCOVERY]: [] as DiscoveredShop[]
+    try {
+      const grouped = {
+        [ShopPriority.RECOMMENDED]: [] as DiscoveredShop[],
+        [ShopPriority.FOLLOWED]: [] as DiscoveredShop[],
+        [ShopPriority.RECENT]: [] as DiscoveredShop[],
+        [ShopPriority.POPULAR]: [] as DiscoveredShop[],
+        [ShopPriority.DISCOVERY]: [] as DiscoveredShop[]
+      }
+      
+      // Combine discoveredShops and searchShops
+      const allShops = [...discoveredShops, ...searchShops]
+      
+      console.log('Grouping shops:', {
+        discoveredShopsCount: discoveredShops.length,
+        searchShopsCount: searchShops.length,
+        allShopsCount: allShops.length
+      })
+
+      allShops.forEach(shop => {
+        try {
+          if (shop && shop.priority) {
+            grouped[shop.priority].push(shop)
+          }
+        } catch (shopError) {
+          console.error('Error processing shop:', shopError, shop)
+        }
+      })
+      
+      console.log('Grouped shops result:', grouped)
+      
+      return grouped
+    } catch (error) {
+      console.error('Error in filteredGroupedShops:', error)
+      // Return empty grouped structure on error
+      return {
+        [ShopPriority.RECOMMENDED]: [],
+        [ShopPriority.FOLLOWED]: [],
+        [ShopPriority.RECENT]: [],
+        [ShopPriority.POPULAR]: [],
+        [ShopPriority.DISCOVERY]: []
+      }
     }
-    
-    filteredShops.forEach(shop => {
-      grouped[shop.priority].push(shop)
-    })
-    
-    return grouped
-  }, [filteredShops])
+  }, [discoveredShops, searchShops])
 
   const handleSelect = async (shop: DiscoveredShop) => {
     // Record the shop visit
@@ -145,8 +269,12 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
   }
 
   const renderSection = (priority: ShopPriority, shops: DiscoveredShop[]) => {
-    if (shops.length === 0) return null
-
+    if (shops.length === 0) {
+      console.log(`Section ${priority} is empty, not rendering`)
+      return null
+    }
+    
+    console.log(`Rendering section ${priority} with ${shops.length} shops`)
     return (
       <section key={priority} className="mb-8">
         <div className="px-4 mb-4">
@@ -220,6 +348,18 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
 
   return (
     <div className="min-h-screen bg-[#550cff] flex flex-col">
+      {/* Debug Info - Remove this later */}
+      <div className="bg-red-500 text-white p-2 text-xs">
+        <div>Search Query: "{searchQuery}"</div>
+        <div>Debounced Query: "{debouncedQuery}"</div>
+        <div>Search Loading: {searchLoading ? 'Yes' : 'No'}</div>
+        <div>Search Error: {searchError ? 'Yes' : 'No'}</div>
+        <div>Search Products Count: {searchProducts?.length || 0}</div>
+        <div>Search Shops Count: {searchShops.length}</div>
+        <div>Discovered Shops Count: {discoveredShops.length}</div>
+        <div>All Shops Count: {discoveredShops.length + searchShops.length}</div>
+      </div>
+
       {/* Header matches Step 2 style (centered) */}
       <header className="relative bg-transparent">
         <div className="px-4 pt-12 pb-4 text-center">
@@ -249,9 +389,18 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
           {/* Search Results Indicator */}
           {searchQuery.trim() && (
             <div className="text-center mt-2">
-              <span className="text-white/80 text-sm">
-                {filteredShops.length} shop{filteredShops.length !== 1 ? 's' : ''} found for "{searchQuery}"
-              </span>
+              {searchLoading ? (
+                <span className="text-white/80 text-sm">
+                  🔍 Searching for fashion shops...
+                </span>
+              ) : (
+                <span className="text-white/80 text-sm">
+                  {searchShops.length > 0 
+                    ? `${searchShops.length} fashion shop${searchShops.length !== 1 ? 's' : ''} found for "${searchQuery}"`
+                    : `No fashion shops found for "${searchQuery}"`
+                  }
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -260,6 +409,29 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
       {/* Scrollable content with sections */}
       <div className="flex-1 overflow-y-auto">
         <div className="py-4">
+          {/* Show search results if searching */}
+          {searchQuery.trim() && searchShops.length > 0 && (
+            <section className="mb-8">
+              <div className="px-4 mb-4">
+                <h2 className="text-xl font-bold text-white">Search Results for "{searchQuery}"</h2>
+                <p className="text-sm text-white/70">{searchShops.length} shop{searchShops.length !== 1 ? 's' : ''} found</p>
+              </div>
+              <div className="px-4">
+                <div className="space-y-4">
+                  {searchShops.map(renderCard)}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Show "no results" message if searching but no results */}
+          {searchQuery.trim() && searchShops.length === 0 && !searchLoading && (
+            <div className="text-center py-8">
+              <p className="text-white text-lg mb-2">No fashion shops found for "{searchQuery}"</p>
+              <p className="text-white/70 text-sm">Try searching for: Nike, Adidas, Zara, luxury fashion, etc.</p>
+            </div>
+          )}
+
           {/* Render each section in priority order */}
           {renderSection(ShopPriority.RECOMMENDED, filteredGroupedShops[ShopPriority.RECOMMENDED])}
           {renderSection(ShopPriority.FOLLOWED, filteredGroupedShops[ShopPriority.FOLLOWED])}
