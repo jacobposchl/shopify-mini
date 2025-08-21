@@ -1,4 +1,31 @@
-import { Recommendation } from '../types'
+import { useState } from 'react'
+
+// Define the types since they're imported from '../types'
+interface Item {
+  name: string
+  price: string
+  brand: string
+  style: string
+  subStyle: string
+  image: string
+  colors: string[]
+}
+
+interface Measurements {
+  chest: number
+  waist: number
+  hips: number
+  shoulders: number
+  armLength: number
+  inseam: number
+}
+
+interface Recommendation {
+  item: Item
+  recommendedSize: string
+  confidence: number
+  measurements: Measurements
+}
 
 // TODO: Replace mock data with real Shopify product data
 // To fix the image issue and get proper Nike product photos:
@@ -19,8 +46,31 @@ export function FinalRecommendation({
   onAddToCart 
 }: FinalRecommendationProps) {
   const { item, recommendedSize, confidence, measurements } = recommendation
-  
+  const [rating, setRating] = useState(0)
+  const [hasRated, setHasRated] = useState(false)
 
+  const handleSubmitRating = () => {
+    setHasRated(true)
+  }
+
+  const StarIcon = ({ filled }: { filled: boolean }) => (
+    <svg
+      className={`w-8 h-8 transition-colors duration-200 ${
+        filled ? 'text-yellow-400' : 'text-gray-300'
+      }`}
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+      />
+    </svg>
+  )
 
   return (
     <div className="min-h-screen">
@@ -37,8 +87,6 @@ export function FinalRecommendation({
       {/* Main Content */}
       <main className="px-4 py-6">
         <div className="space-y-6">
-
-
           {/* Product Card */}
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="relative">
@@ -138,6 +186,52 @@ export function FinalRecommendation({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Rating Section */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Rate Your Experience
+            </h3>
+            {!hasRated ? (
+              <>
+                <p className="text-gray-600 mb-4">
+                  How accurate was your sizing?
+                </p>
+                <div className="flex justify-center space-x-3 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setRating(star)}
+                      className="transform transition-transform hover:scale-110 focus:outline-none"
+                    >
+                      <StarIcon filled={rating >= star} />
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={handleSubmitRating}
+                  className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                    rating > 0
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                  disabled={rating === 0}
+                >
+                  Submit Rating
+                </button>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <div className="text-5xl mb-4">🎉</div>
+                <h4 className="text-xl font-bold text-gray-900 mb-2">
+                  Thanks for your feedback!
+                </h4>
+                <p className="text-gray-600">
+                  Your rating helps us improve the experience for everyone.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}

@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react'
 import { useProductSearch } from '@shopify/shop-minis-react'
 import { BackButton } from './BackButton'
@@ -93,21 +92,47 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
   const products: ClothingItem[] = useMemo(() => {
     if (!shopifyProducts) return []
     
-    return shopifyProducts.map((product) => ({
-      id: product.id,
-      name: product.title,
-      brand: product.shop.name,
-      style: style?.name || 'Unknown',
-      subStyle: subStyle?.name || 'Unknown',
-      price: product.price.amount ? `${product.price.currencyCode} ${product.price.amount}` : 'Price not available',
-      image: product.featuredImage?.url || '',
-      colors: [], // Extract from variants if available
-      sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], // Default sizes for now
-      companyId: product.shop.id,
-      styleId: style?.id || '',
-      subStyleId: subStyle?.id || '',
-      shopifyProduct: product // Keep reference to original Shopify data
-    }))
+    return shopifyProducts.map((product) => {
+      // Extract all possible colors from variants, options, and tags
+      const colors = Array.from(new Set([
+        // From variant options
+        ...product.variants?.nodes?.flatMap(variant => 
+          variant.selectedOptions?.filter(opt => 
+            opt.name.toLowerCase().includes('color') ||
+            opt.name.toLowerCase().includes('colour')
+          ).map(opt => opt.value)
+        ).filter(Boolean) || [],
+        // From product options
+        ...product.options?.filter(opt => 
+          opt.name.toLowerCase().includes('color') ||
+          opt.name.toLowerCase().includes('colour')
+        ).flatMap(opt => opt.values).filter(Boolean) || [],
+        // From product tags
+        ...product.tags?.filter(tag => 
+          tag.toLowerCase().startsWith('color:') ||
+          tag.toLowerCase().startsWith('colour:')
+        ).map(tag => tag.split(':')[1].trim()) || []
+      ])).filter(color => color && color.toLowerCase() !== 'no color');
+
+      // Only use default color if no colors were found
+      const finalColors = colors.length > 0 ? colors : ['Black'];
+
+      return {
+        id: product.id,
+        name: product.title,
+        brand: product.shop.name,
+        style: style?.name || 'Unknown',
+        subStyle: subStyle?.name || 'Unknown',
+        price: product.price.amount ? `${product.price.currencyCode} ${product.price.amount}` : 'Price not available',
+        image: product.featuredImage?.url || '',
+        colors: finalColors,
+        sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], // Still using default sizes for now
+        companyId: product.shop.id,
+        styleId: style?.id || '',
+        subStyleId: subStyle?.id || '',
+        shopifyProduct: product // Keep reference to original Shopify data
+      }
+    })
   }, [shopifyProducts, style?.name, style?.id, subStyle?.name, subStyle?.id])
 
   const isLoading = loading
@@ -302,6 +327,27 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
                     </h3>
                     <p className="text-gray-600 text-xs">{item.brand}</p>
                     <p className="font-semibold text-blue-600 text-sm">{item.price}</p>
+                    
+                    {/* Color options */}
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {item.colors.slice(0, 3).map((color, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded"
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: color.toLowerCase() }}
+                          />
+                          {color}
+                        </span>
+                      ))}
+                      {item.colors.length > 3 && (
+                        <span className="text-xs text-gray-500">
+                          +{item.colors.length - 3}
+                        </span>
+                      )}
+                    </div>
                     
                     {/* Sizes and colors */}
                     <div className="flex flex-wrap gap-1 mt-2">
