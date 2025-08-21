@@ -99,6 +99,97 @@ const filterMockData = (brand?: string, style?: string, subStyle?: string): Clot
   })
 }
 
+// Helper function to clean and validate color names
+const cleanColorName = (color: string): string => {
+  if (!color) return '';
+  
+  // Clean the color string
+  const cleaned = color.trim()
+    .replace(/^color:\s*/i, '')
+    .replace(/^colour:\s*/i, '')
+    .replace(/[-_]/g, ' ')
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+
+  // Return 'None' for invalid/empty colors
+  return cleaned || 'None';
+};
+
+// Add type definition for Shopify product data structure
+interface ShopifyVariant {
+  selectedOptions: Array<{
+    name: string;
+    value: string;
+  }>;
+}
+
+interface ShopifyProduct {
+  id: string;
+  title: string;
+  shop: {
+    id: string;
+    name: string;
+  };
+  price: {
+    amount: string;
+    currencyCode: string;
+  };
+  featuredImage?: {
+    url: string;
+  };
+  variants: {
+    nodes: ShopifyVariant[];
+  };
+  options: Array<{
+    name: string;
+    values: string[];
+  }>;
+  tags: string[];
+}
+
+// Helper function to extract colors from a product
+const extractProductColors = (product: ShopifyProduct): string[] => {
+  if (!product) return ['None'];
+
+  try {
+    // Get color option from product options first
+    const colorOption = product.options?.find(opt => 
+      opt.name.toLowerCase().includes('color') ||
+      opt.name.toLowerCase().includes('colour')
+    );
+
+    if (colorOption) {
+      // If we have a dedicated color option, use those values
+      return colorOption.values.length > 0 ? colorOption.values : ['None'];
+    }
+
+    // Otherwise try to get colors from variants
+    const variantColors = product.variants?.nodes
+      ?.flatMap(variant => 
+        variant.selectedOptions
+          .filter(opt => 
+            opt.name.toLowerCase().includes('color') ||
+            opt.name.toLowerCase().includes('colour')
+          )
+          .map(opt => opt.value)
+      )
+      .filter(Boolean);
+
+    if (variantColors && variantColors.length > 0) {
+      // Remove duplicates and clean up
+      return Array.from(new Set(variantColors));
+    }
+
+    // If no colors found, return None
+    return ['None'];
+
+  } catch (error) {
+    console.warn('Error extracting product colors:', error, product);
+    return ['None'];
+  }
+};
+
 export function useShopifyProducts(
   brand?: string,
   style?: string,
@@ -149,24 +240,33 @@ export function useShopifyProducts(
     }
   }, [products, loading, error])
   
+  // Helper function to format the price
+  const formatPrice = (amount: string): string => {
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount)) return 'Price not available';
+    return `$${numericAmount.toFixed(2)}`;
+  }
+  
   // Transform Shopify products to our ClothingItem format
   const transformedShopifyProducts: ClothingItem[] = useMemo(() => {
     if (!products) return []
     
-    return products.map((product) => ({
+    return products.map((product: ShopifyProduct) => ({
       id: product.id,
       name: product.title,
       brand: product.shop.name,
       style: style || 'Unknown',
       subStyle: subStyle || 'Unknown',
-      price: product.price.amount ? `${product.price.currencyCode} ${product.price.amount}` : 'Price not available',
+      price: product.price.amount 
+        ? formatPrice(product.price.amount)
+        : 'Price not available',
       image: product.featuredImage?.url || '',
-      colors: [], // Extract from variants if available
-      sizes: [], // Extract from variants if available
+      colors: extractProductColors(product),
+      sizes: [], // Will handle sizes separately
       companyId: product.shop.id,
       styleId: style || '',
       subStyleId: subStyle || '',
-      shopifyProduct: product // Keep reference to original Shopify data
+      shopifyProduct: product
     }))
   }, [products, style, subStyle])
   
