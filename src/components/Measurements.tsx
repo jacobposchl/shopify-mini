@@ -377,107 +377,8 @@ export function MeasurementsStepImpl({
     stopDetection()
   }, [stopDetection])
 
-  // Auto-progress when valid
-  useEffect(() => {
-    setDebugEffectCount((prev) => prev + 1)
-
-    if (validation && validation.isValid && validation.progress >= 1.0 && !measurements && !debugAutoTrigger) {
-      setDebugAutoTrigger(true)
-
-      try {
-        const averaged = averageMeasurements(measurementBuffer)
-        setMeasurements(averaged)
-        if (!isDemoMode) stopCamera()
-        onMeasurementsComplete(averaged)
-      } catch (error) {
-        setDebugError((error as Error).message)
-        const fallback = {
-          chest: 42,
-          waist: 32,
-          hips: 38,
-          shoulders: 18,
-          armLength: 25,
-          inseam: 32,
-          height: 70,
-          weight: 165,
-        }
-        setMeasurements(fallback)
-        onMeasurementsComplete(fallback)
-      }
-    }
-
-    if (!validation || !validation.isValid || validation.progress < 1.0) {
-      setDebugAutoTrigger(false)
-      setDebugError('')
-    }
-  }, [
-    validation?.isValid,
-    validation?.progress,
-    measurements,
-    debugAutoTrigger,
-    measurementBuffer,
-    isDemoMode,
-    onMeasurementsComplete,
-    stopCamera,
-  ])
-
-  // Init log
-  useEffect(() => {
-    Logger.info('MeasurementsStep component initialized', {
-      selectedItem: selectedItemName,
-      company: selectedCompanyName,
-      style: selectedStyleName,
-      subStyle: selectedSubStyleName,
-    })
-    return undefined
-  }, [selectedItemName, selectedCompanyName, selectedStyleName, selectedSubStyleName])
-
-  // Canvas sync
-  const syncCanvasToVideo = useCallback(() => {
-    if (!canvasRef.current || !videoRef.current) return
-
-    const canvas = canvasRef.current
-    const video = videoRef.current
-
-    const videoWidth = video.videoWidth
-    const videoHeight = video.videoHeight
-
-    const containerWidth = video.clientWidth
-    const containerHeight = video.clientHeight
-
-    const scaleX = containerWidth / videoWidth
-    const scaleY = containerHeight / videoHeight
-    const scale = Math.min(scaleX, scaleY)
-
-    const displayWidth = videoWidth * scale
-    const displayHeight = videoHeight * scale
-
-    const offsetX = (containerWidth - displayWidth) / 2
-    const offsetY = (containerHeight - displayHeight) / 2
-
-    canvas.width = containerWidth
-    canvas.height = containerHeight
-
-    canvas.dataset.videoScale = scale.toString()
-    canvas.dataset.videoOffsetX = offsetX.toString()
-    canvas.dataset.videoOffsetY = offsetY.toString()
-    canvas.dataset.videoDisplayWidth = displayWidth.toString()
-    canvas.dataset.videoDisplayHeight = displayHeight.toString()
-
-    Logger.info('Canvas synced to video', {
-      videoWidth,
-      videoHeight,
-      containerWidth,
-      containerHeight,
-      scale,
-      displayWidth,
-      displayHeight,
-      offsetX,
-      offsetY,
-    })
-  }, [])
-
-  const averageMeasurements = (arr: Measurements[]): Measurements => {
+  // Helper function to average measurements
+  const averageMeasurements = useCallback((arr: Measurements[]): Measurements => {
     if (arr.length === 0) {
       return {
         chest: 42,
@@ -526,7 +427,107 @@ export function MeasurementsStepImpl({
       height: round1(sum.height / c),
       weight: round1(sum.weight / c),
     }
-  }
+  }, [])
+
+  // Auto-progress when valid
+  useEffect(() => {
+    setDebugEffectCount((prev) => prev + 1)
+
+    if (validation && validation.isValid && validation.progress >= 1.0 && !measurements && !debugAutoTrigger) {
+      setDebugAutoTrigger(true)
+
+      try {
+        const averaged = averageMeasurements(measurementBuffer)
+        setMeasurements(averaged)
+        if (!isDemoMode) stopCamera()
+        onMeasurementsComplete(averaged)
+      } catch (error) {
+        setDebugError((error as Error).message)
+        const fallback = {
+          chest: 42,
+          waist: 32,
+          hips: 38,
+          shoulders: 18,
+          armLength: 25,
+          inseam: 32,
+          height: 70,
+          weight: 165,
+        }
+        setMeasurements(fallback)
+        onMeasurementsComplete(fallback)
+      }
+    }
+
+    if (!validation || !validation.isValid || validation.progress < 1.0) {
+      setDebugAutoTrigger(false)
+      setDebugError('')
+    }
+  }, [
+    validation?.isValid,
+    validation?.progress,
+    measurements,
+    debugAutoTrigger,
+    measurementBuffer,
+    isDemoMode,
+    onMeasurementsComplete,
+    stopCamera,
+    averageMeasurements,
+  ])
+
+  // Init log
+  useEffect(() => {
+    Logger.info('MeasurementsStep component initialized', {
+      selectedItem: selectedItemName,
+      company: selectedCompanyName,
+      style: selectedStyleName,
+      subStyle: selectedSubStyleName,
+    })
+  }, [selectedItemName, selectedCompanyName, selectedStyleName, selectedSubStyleName])
+
+  // Canvas sync
+  const syncCanvasToVideo = useCallback(() => {
+    if (!canvasRef.current || !videoRef.current) return
+
+    const canvas = canvasRef.current
+    const video = videoRef.current
+
+    const videoWidth = video.videoWidth
+    const videoHeight = video.videoHeight
+
+    const containerWidth = video.clientWidth
+    const containerHeight = video.clientHeight
+
+    const scaleX = containerWidth / videoWidth
+    const scaleY = containerHeight / videoHeight
+    const scale = Math.min(scaleX, scaleY)
+
+    const displayWidth = videoWidth * scale
+    const displayHeight = videoHeight * scale
+
+    const offsetX = (containerWidth - displayWidth) / 2
+    const offsetY = (containerHeight - displayHeight) / 2
+
+    canvas.width = containerWidth
+    canvas.height = containerHeight
+
+    canvas.dataset.videoScale = scale.toString()
+    canvas.dataset.videoOffsetX = offsetX.toString()
+    canvas.dataset.videoOffsetY = offsetY.toString()
+    canvas.dataset.videoDisplayWidth = displayWidth.toString()
+    canvas.dataset.videoDisplayHeight = displayHeight.toString()
+
+    Logger.info('Canvas synced to video', {
+      videoWidth,
+      videoHeight,
+      containerWidth,
+      containerHeight,
+      scale,
+      displayWidth,
+      displayHeight,
+      offsetX,
+      offsetY,
+    })
+  }, [])
 
   // Draw landmarks
   useEffect(() => {
@@ -1248,19 +1249,16 @@ export function MeasurementsStepImpl({
 
   return (
     <div className="min-h-screen flex flex-col bg-[#550cff]">
-      {/* Themed header (matches steps 2/3): back button in top-left, centered step/title/subtitle */}
+      {/* Header - matches style of other pages */}
       <header className="relative bg-transparent">
-        <div className="absolute top-3 left-3 z-10">
+        <div className="absolute top-4 left-4 z-10">
           <BackButton onClick={onCancel} />
         </div>
 
-        <div className="px-4 pt-12 pb-4 text-center">
-          <div className="mb-1">
-            <span className="text-sm font-medium text-white">Step 5 of 6</span>
-          </div>
-          <h1 className="text-2xl font-extrabold text-white">Get Your Measurements</h1>
+        <div className="px-4 pt-16 pb-4 text-center">
+          <h1 className="text-xl font-bold text-white">Get Your Measurements</h1>
           <p className="text-sm text-white/80">
-            {isDemoMode ? 'Demo Mode - Simulated measurements' : "We’ll use your camera to measure you perfectly"}
+            {isDemoMode ? 'Demo Mode - Simulated measurements' : "We'll use your camera to measure you perfectly"}
           </p>
         </div>
       </header>
