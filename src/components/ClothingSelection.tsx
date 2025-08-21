@@ -84,12 +84,83 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
     }))
   }, [shopifyProducts])
 
+  // Dynamically generate clothing categories based on what the shop actually sells
+  const availableCategories = useMemo(() => {
+    if (!products.length) return []
+    
+    const categoryMap = new Map<string, number>()
+    
+    products.forEach(product => {
+      const productName = product.name.toLowerCase()
+      const productType = (product.shopifyProduct as any)?.productType?.toLowerCase() || ''
+      const tags = (product.shopifyProduct as any)?.tags?.map((tag: string) => tag.toLowerCase()) || []
+      
+      // Check for specific clothing categories
+      const categories = [
+        { key: 'shirts', keywords: ['shirt', 't-shirt', 'tshirt', 'polo', 'button-down', 'blouse', 'top', 'tank', 'crop'] },
+        { key: 'pants', keywords: ['pants', 'jeans', 'trousers', 'slacks', 'chinos', 'khakis', 'cargo', 'joggers', 'sweatpants'] },
+        { key: 'dresses', keywords: ['dress', 'gown', 'frock', 'jumpsuit', 'romper', 'bodysuit'] },
+        { key: 'skirts', keywords: ['skirt', 'mini', 'midi', 'maxi', 'pencil', 'pleated'] },
+        { key: 'shorts', keywords: ['shorts', 'bermuda', 'athletic shorts'] },
+        { key: 'outerwear', keywords: ['jacket', 'coat', 'blazer', 'sweater', 'hoodie', 'cardigan', 'vest'] },
+        { key: 'activewear', keywords: ['active', 'athletic', 'workout', 'gym', 'sport', 'training', 'leggings'] },
+        { key: 'underwear', keywords: ['underwear', 'lingerie', 'bra', 'panties', 'boxers', 'briefs'] },
+        { key: 'sleepwear', keywords: ['sleep', 'pajamas', 'pjs', 'nightgown', 'robe', 'loungewear'] },
+        { key: 'swimwear', keywords: ['swim', 'bathing', 'bikini', 'swimsuit', 'beach'] }
+      ]
+      
+      categories.forEach(category => {
+        const hasCategory = category.keywords.some(keyword => 
+          productName.includes(keyword) || 
+          productType.includes(keyword) ||
+          tags.some((tag: string) => tag.includes(keyword))
+        )
+        
+        if (hasCategory) {
+          categoryMap.set(category.key, (categoryMap.get(category.key) || 0) + 1)
+        }
+      })
+    })
+    
+    // Convert to array and sort by count (most popular categories first)
+    return Array.from(categoryMap.entries())
+      .sort(([,a], [,b]) => b - a)
+      .map(([category]) => category)
+  }, [products])
+
   // Apply filters to products
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      // Category filter
-      if (selectedCategory && !product.name.toLowerCase().includes(selectedCategory.toLowerCase())) {
-        return false
+      // Category filter - check against available categories
+      if (selectedCategory) {
+        const productName = product.name.toLowerCase()
+        const productType = (product.shopifyProduct as any)?.productType?.toLowerCase() || ''
+        const tags = (product.shopifyProduct as any)?.tags?.map((tag: string) => tag.toLowerCase()) || []
+        
+        // Check if product matches the selected category
+        const categoryKeywords = {
+          'shirts': ['shirt', 't-shirt', 'tshirt', 'polo', 'button-down', 'blouse', 'top', 'tank', 'crop'],
+          'pants': ['pants', 'jeans', 'trousers', 'slacks', 'chinos', 'khakis', 'cargo', 'joggers', 'sweatpants'],
+          'dresses': ['dress', 'gown', 'frock', 'jumpsuit', 'romper', 'bodysuit'],
+          'skirts': ['skirt', 'mini', 'midi', 'maxi', 'pencil', 'pleated'],
+          'shorts': ['shorts', 'bermuda', 'athletic shorts'],
+          'outerwear': ['jacket', 'coat', 'blazer', 'sweater', 'hoodie', 'cardigan', 'vest'],
+          'activewear': ['active', 'athletic', 'workout', 'gym', 'sport', 'training', 'leggings'],
+          'underwear': ['underwear', 'lingerie', 'bra', 'panties', 'boxers', 'briefs'],
+          'sleepwear': ['sleep', 'pajamas', 'pjs', 'nightgown', 'robe', 'loungewear'],
+          'swimwear': ['swim', 'bathing', 'bikini', 'swimsuit', 'beach']
+        }
+        
+        const keywords = categoryKeywords[selectedCategory as keyof typeof categoryKeywords] || []
+        const hasCategory = keywords.some(keyword => 
+          productName.includes(keyword) || 
+          productType.includes(keyword) ||
+          tags.some((tag: string) => tag.includes(keyword))
+        )
+        
+        if (!hasCategory) {
+          return false
+        }
       }
       
       // Gender filter (basic implementation)
@@ -254,13 +325,26 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
               className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/40"
             >
               <option value="">All Categories</option>
-              <option value="shirts">Shirts</option>
-              <option value="pants">Pants</option>
-              <option value="dresses">Dresses</option>
-              <option value="shoes">Shoes</option>
-              <option value="accessories">Accessories</option>
-              <option value="outerwear">Outerwear</option>
+              {availableCategories.map(category => (
+                <option key={category} value={category}>
+                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                </option>
+              ))}
             </select>
+            
+            {/* Show available categories info */}
+            {availableCategories.length > 0 && (
+              <p className="text-xs text-white/60 mt-1">
+                This shop sells: {availableCategories.slice(0, 3).join(', ')}
+                {availableCategories.length > 3 && ` and ${availableCategories.length - 3} more`}
+              </p>
+            )}
+            
+            {availableCategories.length === 0 && products.length > 0 && (
+              <p className="text-xs text-white/60 mt-1">
+                No specific clothing categories detected, but {products.length} clothing items available
+              </p>
+            )}
           </div>
           
           {/* Gender Filter */}

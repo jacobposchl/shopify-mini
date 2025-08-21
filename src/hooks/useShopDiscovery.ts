@@ -1,7 +1,9 @@
+// src/hooks/useShopDiscovery.ts (Enhanced Version)
 import { useRecommendedShops, useFollowedShops, useRecentShops, useAsyncStorage } from '@shopify/shop-minis-react'
 import { useMemo, useCallback, useState, useEffect } from 'react'
 import type { DiscoveredShop } from '../types'
 import { ShopPriority } from '../types'
+import { useFashionShopValidator } from './useFashionShopValidator'
 
 export function useShopDiscovery() {
   // Direct shop discovery using proper Shopify SDK hooks
@@ -31,9 +33,13 @@ export function useShopDiscovery() {
 
   const { getItem, setItem } = useAsyncStorage()
   
+  // Fashion validation hook
+  const { quickFilterShops, validateShops, isValidating } = useFashionShopValidator()
+  
   // Local state for user preferences
   const [localFollowedShops, setLocalFollowedShops] = useState<string[]>([])
   const [localRecentShops, setLocalRecentShops] = useState<string[]>([])
+  const [filteredShops, setFilteredShops] = useState<DiscoveredShop[]>([])
 
   // Load user preferences on mount
   useEffect(() => {
@@ -74,8 +80,8 @@ export function useShopDiscovery() {
     }
   }, [])
 
-  // Combine all shop sources with proper priority ranking
-  const allShops = useMemo(() => {
+  // Combine all shop sources with proper priority ranking (BEFORE filtering)
+  const allShopsBeforeFilter = useMemo(() => {
     const shops: DiscoveredShop[] = []
 
     // Priority 1: Followed shops (highest priority)
@@ -108,7 +114,29 @@ export function useShopDiscovery() {
     return shops
   }, [followedShops, recentShops, recommendedShops, transformShop])
 
-  // Group shops by priority for UI display
+  // Apply fashion filtering when shops change
+  useEffect(() => {
+    if (allShopsBeforeFilter.length > 0) {
+      // Use product-based validation (async)
+      const validateAndFilterShops = async () => {
+        try {
+          const fashionShops = await quickFilterShops(allShopsBeforeFilter)
+          
+          setFilteredShops(fashionShops)
+        } catch (error) {
+          console.error('Error during product-based shop validation:', error)
+          // Fallback: show all shops if validation fails
+          setFilteredShops(allShopsBeforeFilter)
+        }
+      }
+      
+      validateAndFilterShops()
+    } else {
+      setFilteredShops([])
+    }
+  }, [allShopsBeforeFilter, quickFilterShops])
+
+  // Group filtered shops by priority for UI display
   const groupedShops = useMemo(() => {
     const grouped = {
       [ShopPriority.RECENT]: [] as DiscoveredShop[],
@@ -118,17 +146,17 @@ export function useShopDiscovery() {
       [ShopPriority.DISCOVERY]: [] as DiscoveredShop[]
     }
 
-    allShops.forEach(shop => {
+    filteredShops.forEach(shop => {
       if (grouped[shop.priority]) {
         grouped[shop.priority].push(shop)
       }
     })
 
     return grouped
-  }, [allShops])
+  }, [filteredShops])
 
-  // Loading state - true if any source is loading
-  const loading = recommendedLoading || followedLoading || recentLoading
+  // Loading state - true if any source is loading or validating
+  const loading = recommendedLoading || followedLoading || recentLoading || isValidating
 
   // Error state - true if any source has an error
   const hasError = recommendedError || followedError || recentError
@@ -146,9 +174,9 @@ export function useShopDiscovery() {
 
   const unfollowShop = useCallback(async (shopId: string) => {
     try {
-      const updated = localFollowedShops.filter(id => id !== shopId)
-      await setItem({ key: 'followedShops', value: JSON.stringify(updated) })
-      setLocalFollowedShops(updated)
+      const newFollowed = localFollowedShops.filter(id => id !== shopId)
+      await setItem({ key: 'followedShops', value: JSON.stringify(newFollowed) })
+      setLocalFollowedShops(newFollowed)
     } catch (error) {
       console.error('Error unfollowing shop:', error)
     }
@@ -156,8 +184,8 @@ export function useShopDiscovery() {
 
   const recordShopVisit = useCallback(async (shopId: string) => {
     try {
-      // Remove if already exists, then add to front
-      const newRecent = [shopId, ...localRecentShops.filter(id => id !== shopId)].slice(0, 20)
+      // Add to recent shops (keep last 10)
+      const newRecent = [shopId, ...localRecentShops.filter(id => id !== shopId)].slice(0, 10)
       await setItem({ key: 'recentShops', value: JSON.stringify(newRecent) })
       setLocalRecentShops(newRecent)
     } catch (error) {
@@ -165,31 +193,41 @@ export function useShopDiscovery() {
     }
   }, [localRecentShops, setItem])
 
-  // User preferences object for UI state
+  // User preferences summary
   const userPreferences = useMemo(() => ({
     followedShops: localFollowedShops,
-    recentShops: localRecentShops
-  }), [localFollowedShops, localRecentShops])
+    recentShops: localRecentShops,
+    recommendedShops: recommendedShops?.map(shop => shop.id) || []
+  }), [localFollowedShops, localRecentShops, recommendedShops])
 
   return {
-    shops: allShops,
+    // Filtered shops (fashion-only)
+    shops: filteredShops,
     groupedShops,
+    
+    // Original shops (before filtering) - for debugging
+    allShopsBeforeFilter,
+    
+    // State
     loading,
-    hasError,
+    hasError: hasError || false,
+    
+    // Actions
     followShop,
     unfollowShop,
     recordShopVisit,
-    userPreferences,
-    // Loading states for individual sections
-    recommendedLoading,
-    followedLoading,
-    recentLoading,
-    // Pagination functions for infinite scroll
+    
+    // Pagination
     fetchMoreRecommended,
+    recommendedLoading,
     hasMoreRecommended,
-    fetchMoreFollowed,
-    hasMoreFollowed,
-    fetchMoreRecent,
-    hasMoreRecent
+    
+    // User data
+    userPreferences,
+    
+    // Filtering info
+    isValidating,
+    totalShopsFound: allShopsBeforeFilter.length,
+    fashionShopsFound: filteredShops.length
   }
 }
