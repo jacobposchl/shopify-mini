@@ -1,8 +1,6 @@
 import { useFlowState } from './hooks/useFlowState'
 import { generateRecommendation } from './utils/recommendationEngine'
 import { CompanySelection } from './components/CompanySelection'
-import { StyleSelection } from './components/StyleSelection'
-import { SubStyleSelection } from './components/SubStyleSelection'
 import { ClothingSelection } from './components/ClothingSelection'
 import { MeasurementsStep } from './components/Measurements'
 import { FinalRecommendation } from './components/FinalRecommendation'
@@ -12,8 +10,6 @@ export function App() {
   const {
     flowState,
     selectCompany,
-    selectStyle,
-    selectSubStyle,
     setMeasurements,
     setRecommendations,
     resetFlow,
@@ -29,16 +25,6 @@ export function App() {
 
   const handleCompanySelect = (company: any) => {
     selectCompany(company)
-    goToNextStep()
-  }
-
-  const handleStyleSelect = (style: any) => {
-    selectStyle(style)
-    goToNextStep()
-  }
-
-  const handleSubStyleSelect = (subStyle: any) => {
-    selectSubStyle(subStyle)
     goToNextStep()
   }
 
@@ -95,34 +81,12 @@ export function App() {
           />
         )
 
-      case 'style-selection':
-        return (
-          <StyleSelection
-            onStyleSelect={handleStyleSelect}
-            selectedStyle={flowState.userPreferences.selectedStyle}
-            selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
-            onBack={handleBack}
-          />
-        )
-
-      case 'substyle-selection':
-        return (
-          <SubStyleSelection
-            onSubStyleSelect={handleSubStyleSelect}
-            selectedSubStyle={flowState.userPreferences.selectedSubStyle}
-            selectedStyleId={flowState.userPreferences.selectedStyle?.id}
-            onBack={handleBack}
-          />
-        )
-
       case 'clothing-selection':
         return (
           <ClothingSelection
             onBack={handleBack}
             onItemSelect={handleItemSelect}
             selectedCompany={flowState.userPreferences.selectedCompany}
-            selectedStyle={flowState.userPreferences.selectedStyle}
-            selectedSubStyle={flowState.userPreferences.selectedSubStyle}
           />
         )
 
@@ -134,9 +98,9 @@ export function App() {
             onCancel={handleBack}
             selectedItemName={flowState.recommendations?.[0]?.item.name}
             selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
-            selectedStyleName={flowState.userPreferences.selectedStyle?.name}
-            selectedSubStyleName={flowState.userPreferences.selectedSubStyle?.name}
-            selectedStyleId={flowState.userPreferences.selectedStyle?.id}
+            selectedStyleName={flowState.userPreferences.selectedCompany?.name}
+            selectedSubStyleName={flowState.userPreferences.selectedCompany?.name}
+            selectedStyleId={flowState.userPreferences.selectedCompany?.id}
           />
         )
 

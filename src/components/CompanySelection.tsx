@@ -2,7 +2,9 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useAsyncStorage, useProductSearch } from '@shopify/shop-minis-react'
 import type { Company } from '../types'
-import { useShopDiscovery, type DiscoveredShop, ShopPriority } from '../hooks/useShopDiscovery'
+import { useShopDiscovery } from '../hooks/useShopDiscovery'
+import type { DiscoveredShop } from '../types'
+import { ShopPriority } from '../types'
 
 interface CompanySelectionProps {
   onCompanySelect: (company: Company) => void
@@ -19,10 +21,14 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     shops: discoveredShops,
     groupedShops,
     loading,
+    hasError: discoveryError,
     followShop,
     unfollowShop,
     recordShopVisit,
-    userPreferences
+    userPreferences,
+    fetchMoreRecommended,
+    recommendedLoading,
+    hasMoreRecommended
   } = useShopDiscovery()
 
   // Error boundary - if anything crashes, show fallback
@@ -57,30 +63,26 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     }
   }, [searchQuery])
 
-  // Real-time shop search using SDK
+  // User-initiated search using product search to find shops
   const { products: searchProducts, loading: searchLoading, error: searchError } = useProductSearch({
-    query: debouncedQuery ? `${debouncedQuery} fashion clothing apparel` : 'fashion clothing',
-    first: 100,
+    query: debouncedQuery ? `${debouncedQuery} fashion clothing apparel` : '',
+    first: 50,
     includeSensitive: false
   })
 
-  // Extract and filter fashion shops from search results
+  // Extract shops from search results (only when user is actively searching)
   const searchShops = useMemo(() => {
     try {
       if (!searchProducts || !debouncedQuery.trim()) return []
       
       const shopMap = new Map<string, DiscoveredShop>()
       
-      searchProducts.forEach(product => {
+      searchProducts.forEach((product: any, index: number) => {
         try {
           const shopId = product.shop?.id
           const shopName = product.shop?.name
           
           if (!shopId || !shopName) return
-          
-          // Only include fashion-related shops
-          const isFashionShop = isFashionRelated(product, shopName.toLowerCase())
-          if (!isFashionShop) return
           
           if (!shopMap.has(shopId)) {
             shopMap.set(shopId, {
@@ -97,7 +99,6 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
         }
       })
       
-      // Return shops sorted by name for consistency
       return Array.from(shopMap.values()).sort((a, b) => a.name.localeCompare(b.name))
     } catch (error) {
       console.error('Error in searchShops:', error)
@@ -105,73 +106,26 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     }
   }, [searchProducts, debouncedQuery])
 
-  // Helper function to filter fashion-only shops
-  const isFashionRelated = (product: any, shopName: string) => {
-    const fashionKeywords = [
-      'clothing', 'fashion', 'apparel', 'wear', 'style', 'outfit',
-      'dress', 'shirt', 'pants', 'shoes', 'accessories', 'jewelry',
-      'bag', 'purse', 'hat', 'scarf', 'belt', 'watch'
-    ]
-    
-    const productTitle = product.title?.toLowerCase() || ''
-    const productTags = product.tags?.map((tag: string) => tag.toLowerCase()) || []
-    
-    // Check if shop name contains fashion keywords
-    const shopIsFashion = fashionKeywords.some(keyword => shopName.includes(keyword))
-    
-    // Check if product title contains fashion keywords
-    const productIsFashion = fashionKeywords.some(keyword => 
-      productTitle.includes(keyword) || productTags.includes(keyword)
-    )
-    
-    return shopIsFashion || productIsFashion
-  }
-
-  // Group filtered shops by priority for display
-  const filteredGroupedShops = useMemo(() => {
-    try {
-      const grouped = {
-        [ShopPriority.RECOMMENDED]: [] as DiscoveredShop[],
-        [ShopPriority.FOLLOWED]: [] as DiscoveredShop[],
-        [ShopPriority.RECENT]: [] as DiscoveredShop[],
-        [ShopPriority.POPULAR]: [] as DiscoveredShop[],
-        [ShopPriority.DISCOVERY]: [] as DiscoveredShop[]
-      }
+  // Combine discovered shops with search results for display
+  const displayShops = useMemo(() => {
+    if (debouncedQuery.trim()) {
+      // When searching, show search results first, then discovered shops
+      const merged = { ...groupedShops }
       
-      // Combine discoveredShops and searchShops
-      const allShops = [...discoveredShops, ...searchShops]
+      // Add search results to DISCOVERY section, but avoid duplicates
+      const existingDiscovery = groupedShops[ShopPriority.DISCOVERY] || []
+      const searchShopsUnique = searchShops.filter(searchShop => 
+        !existingDiscovery.some(existing => existing.id === searchShop.id)
+      )
       
-      console.log('Grouping shops:', {
-        discoveredShopsCount: discoveredShops.length,
-        searchShopsCount: searchShops.length,
-        allShopsCount: allShops.length
-      })
-
-      allShops.forEach(shop => {
-        try {
-          if (shop && shop.priority) {
-            grouped[shop.priority].push(shop)
-          }
-        } catch (shopError) {
-          console.error('Error processing shop:', shopError, shop)
-        }
-      })
+      merged[ShopPriority.DISCOVERY] = [...searchShops, ...existingDiscovery]
       
-      console.log('Grouped shops result:', grouped)
-      
-      return grouped
-    } catch (error) {
-      console.error('Error in filteredGroupedShops:', error)
-      // Return empty grouped structure on error
-      return {
-        [ShopPriority.RECOMMENDED]: [],
-        [ShopPriority.FOLLOWED]: [],
-        [ShopPriority.RECENT]: [],
-        [ShopPriority.POPULAR]: [],
-        [ShopPriority.DISCOVERY]: []
-      }
+      return merged
+    } else {
+      // When not searching, show discovered shops only
+      return groupedShops
     }
-  }, [discoveredShops, searchShops])
+  }, [debouncedQuery, searchShops, groupedShops]) as Record<ShopPriority, DiscoveredShop[]>
 
   const handleSelect = async (shop: DiscoveredShop) => {
     // Record the shop visit
@@ -184,7 +138,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     clicks[shop.id] = (clicks[shop.id] ?? 0) + 1
     await setItem({ key: 'brandClicks', value: JSON.stringify(clicks) })
     
-    // Call the original selection handler
+    // Call the original selection handler to go directly to clothing selection
     onCompanySelect(shop)
   }
 
@@ -200,7 +154,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
 
   const getSectionTitle = (priority: ShopPriority) => {
     const titles = {
-      [ShopPriority.RECOMMENDED]: 'Recommended for You',
+      [ShopPriority.RECOMMENDED]: 'For You',
       [ShopPriority.FOLLOWED]: 'Shops You Follow',
       [ShopPriority.RECENT]: 'Recently Visited',
       [ShopPriority.POPULAR]: 'Trending Shops',
@@ -270,22 +224,33 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
 
   const renderSection = (priority: ShopPriority, shops: DiscoveredShop[]) => {
     if (shops.length === 0) {
-      console.log(`Section ${priority} is empty, not rendering`)
       return null
     }
     
-    console.log(`Rendering section ${priority} with ${shops.length} shops`)
     return (
       <section key={priority} className="mb-8">
-        <div className="px-4 mb-4">
+        <div className="sticky top-0 z-10 bg-[#550cff] px-4 py-3 border-b border-white/10">
           <h2 className="text-xl font-bold text-white">{getSectionTitle(priority)}</h2>
           <p className="text-sm text-white/70">{shops.length} shop{shops.length !== 1 ? 's' : ''}</p>
         </div>
         
-        <div className="px-4">
+        <div className="px-4 pt-4">
           <div className="space-y-4">
             {shops.map(renderCard)}
           </div>
+          
+          {/* Load More Button for For You section */}
+          {priority === ShopPriority.RECOMMENDED && hasMoreRecommended && (
+            <div className="mt-6 text-center">
+              <button
+                onClick={fetchMoreRecommended}
+                disabled={recommendedLoading}
+                className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {recommendedLoading ? 'Loading...' : 'Load More Shops'}
+              </button>
+            </div>
+          )}
         </div>
       </section>
     )
@@ -297,10 +262,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
       <div className="min-h-screen bg-[#550cff] flex flex-col">
         <header className="relative bg-transparent">
           <div className="px-4 pt-12 pb-4 text-center">
-            <div className="mb-1">
-              <span className="text-sm font-medium text-white">Step 1 of 6</span>
-            </div>
-            <h1 className="text-2xl font-extrabold text-white">Choose Your Brand</h1>
+            <h1 className="text-2xl font-extrabold text-white">Select Shop</h1>
             <p className="text-sm text-white/80">Discovering shops from Shopify...</p>
           </div>
         </header>
@@ -322,10 +284,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
       <div className="min-h-screen bg-[#550cff] flex flex-col">
         <header className="relative bg-transparent">
           <div className="px-4 pt-12 pb-4 text-center">
-            <div className="mb-1">
-              <span className="text-sm font-medium text-white">Step 1 of 6</span>
-            </div>
-            <h1 className="text-2xl font-extrabold text-white">Choose Your Brand</h1>
+            <h1 className="text-2xl font-extrabold text-white">Select Shop</h1>
             <p className="text-sm text-white/80">No shops found</p>
           </div>
         </header>
@@ -348,24 +307,9 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
 
   return (
     <div className="min-h-screen bg-[#550cff] flex flex-col">
-      {/* Debug Info - Remove this later */}
-      <div className="bg-red-500 text-white p-2 text-xs">
-        <div>Search Query: "{searchQuery}"</div>
-        <div>Debounced Query: "{debouncedQuery}"</div>
-        <div>Search Loading: {searchLoading ? 'Yes' : 'No'}</div>
-        <div>Search Error: {searchError ? 'Yes' : 'No'}</div>
-        <div>Search Products Count: {searchProducts?.length || 0}</div>
-        <div>Search Shops Count: {searchShops.length}</div>
-        <div>Discovered Shops Count: {discoveredShops.length}</div>
-        <div>All Shops Count: {discoveredShops.length + searchShops.length}</div>
-      </div>
-
       {/* Header matches Step 2 style (centered) */}
       <header className="relative bg-transparent">
         <div className="px-4 pt-12 pb-4 text-center">
-          <div className="mb-1">
-            <span className="text-base font-medium text-white">Step 1 of 6</span>
-          </div>
           <h1 className="text-3xl font-extrabold text-white">Select Shop</h1>
         </div>
         
@@ -391,13 +335,13 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
             <div className="text-center mt-2">
               {searchLoading ? (
                 <span className="text-white/80 text-sm">
-                  🔍 Searching for fashion shops...
+                  🔍 Searching for shops...
                 </span>
               ) : (
                 <span className="text-white/80 text-sm">
                   {searchShops.length > 0 
-                    ? `${searchShops.length} fashion shop${searchShops.length !== 1 ? 's' : ''} found for "${searchQuery}"`
-                    : `No fashion shops found for "${searchQuery}"`
+                    ? `${searchShops.length} shop${searchShops.length !== 1 ? 's' : ''} found for "${searchQuery}"`
+                    : `No shops found for "${searchQuery}"`
                   }
                 </span>
               )}
@@ -412,11 +356,11 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
           {/* Show search results if searching */}
           {searchQuery.trim() && searchShops.length > 0 && (
             <section className="mb-8">
-              <div className="px-4 mb-4">
-                <h2 className="text-xl font-bold text-white">Search Results for "{searchQuery}"</h2>
+              <div className="sticky top-0 z-10 bg-[#550cff] px-4 py-3 border-b border-white/10">
+                <h2 className="text-xl font-bold text-white">Shops Found for "{searchQuery}"</h2>
                 <p className="text-sm text-white/70">{searchShops.length} shop{searchShops.length !== 1 ? 's' : ''} found</p>
               </div>
-              <div className="px-4">
+              <div className="px-4 pt-4">
                 <div className="space-y-4">
                   {searchShops.map(renderCard)}
                 </div>
@@ -427,17 +371,17 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
           {/* Show "no results" message if searching but no results */}
           {searchQuery.trim() && searchShops.length === 0 && !searchLoading && (
             <div className="text-center py-8">
-              <p className="text-white text-lg mb-2">No fashion shops found for "{searchQuery}"</p>
+              <p className="text-white text-lg mb-2">No shops found for "{searchQuery}"</p>
               <p className="text-white/70 text-sm">Try searching for: Nike, Adidas, Zara, luxury fashion, etc.</p>
             </div>
           )}
 
           {/* Render each section in priority order */}
-          {renderSection(ShopPriority.RECOMMENDED, filteredGroupedShops[ShopPriority.RECOMMENDED])}
-          {renderSection(ShopPriority.FOLLOWED, filteredGroupedShops[ShopPriority.FOLLOWED])}
-          {renderSection(ShopPriority.RECENT, filteredGroupedShops[ShopPriority.RECENT])}
-          {renderSection(ShopPriority.POPULAR, filteredGroupedShops[ShopPriority.POPULAR])}
-          {renderSection(ShopPriority.DISCOVERY, filteredGroupedShops[ShopPriority.DISCOVERY])}
+          {renderSection(ShopPriority.RECENT, displayShops[ShopPriority.RECENT] || [])}
+          {renderSection(ShopPriority.FOLLOWED, displayShops[ShopPriority.FOLLOWED] || [])}
+          {renderSection(ShopPriority.RECOMMENDED, displayShops[ShopPriority.RECOMMENDED] || [])}
+          {renderSection(ShopPriority.POPULAR, displayShops[ShopPriority.POPULAR] || [])}
+          {renderSection(ShopPriority.DISCOVERY, displayShops[ShopPriority.DISCOVERY] || [])}
         </div>
       </div>
     </div>

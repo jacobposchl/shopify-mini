@@ -3,38 +3,37 @@ import { useState, useMemo } from 'react'
 import { useProductSearch } from '@shopify/shop-minis-react'
 import { BackButton } from './BackButton'
 import { ProductImage } from './ProductImage'
-import type { ClothingItem, Company, Style, SubStyle } from '../types'
+import type { ClothingItem, Company } from '../types'
 import type { ProductFilters, ProductSearchSortBy } from '@shopify/shop-minis-react'
 
 interface ClothingSelectionProps {
   onBack: () => void
   onItemSelect: (item: ClothingItem) => void
   selectedCompany?: Company
-  selectedStyle?: Style
-  selectedSubStyle?: SubStyle
 }
 
-export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selectedStyle, selectedSubStyle }: ClothingSelectionProps) {
+export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: ClothingSelectionProps) {
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null)
   
-  // Get user selections from previous steps (now passed as props)
+  // Filter states
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
+  const [selectedGender, setSelectedGender] = useState<string>('all')
+  const [selectedPriceRange, setSelectedPriceRange] = useState<string>('all')
+  
+  // Get user selections from previous steps (now only company)
   const company = selectedCompany
-  const style = selectedStyle
-  const subStyle = selectedSubStyle
   
   // Build search query and filters for Shopify
   const searchQuery = useMemo(() => {
     const terms = []
     if (company?.name) terms.push(company.name)
-    if (style?.name) terms.push(style.name)
-    if (subStyle?.name) terms.push(subStyle.name)
     
     if (terms.length === 0) {
       return 'clothing apparel'
     }
     
     return terms.join(' ')
-  }, [company?.name, style?.name, subStyle?.name])
+  }, [company?.name])
 
   // Ensure we have a valid search query
   const finalSearchQuery = searchQuery.trim() || 'clothing apparel'
@@ -43,16 +42,17 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
     const filters: ProductFilters = {}
     
     // Only add category filter if we have a style - keep it simple
-    if (style?.name) {
-      // Use a single item array for now
-      filters.category = [style.name.toLowerCase()]
-    }
+    // This logic is now redundant as style and subStyle are removed
+    // if (style?.name) {
+    //   // Use a single item array for now
+    //   filters.category = [style.name.toLowerCase()]
+    // }
     
     // Skip gender filter for now to test basic functionality
     // We can add it back once we confirm the basic search works
     
     return filters
-  }, [style?.name])
+  }, [])
 
   // Use the official Shopify Minis SDK hook
   const { products: shopifyProducts, loading, error } = useProductSearch({
@@ -64,31 +64,6 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
     includeSensitive: false
   })
 
-  // Debug logging for troubleshooting
-  console.log('ClothingSelection - useProductSearch params:', {
-    query: finalSearchQuery,
-    filters,
-    sortBy: 'RELEVANCE',
-    first: 50,
-    includeSensitive: false
-  })
-  
-  console.log('ClothingSelection - Filter details:', {
-    filtersObject: filters,
-    filtersKeys: Object.keys(filters),
-    filtersValues: Object.values(filters),
-    filtersStringified: JSON.stringify(filters),
-    styleName: style?.name,
-    styleId: style?.id
-  })
-  
-  console.log('ClothingSelection - useProductSearch result:', {
-    products: shopifyProducts,
-    loading,
-    error,
-    productsCount: shopifyProducts?.length || 0
-  })
-
   // Transform Shopify products to our ClothingItem format
   const products: ClothingItem[] = useMemo(() => {
     if (!shopifyProducts) return []
@@ -97,30 +72,72 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
       id: product.id,
       name: product.title,
       brand: product.shop.name,
-      style: style?.name || 'Unknown',
-      subStyle: subStyle?.name || 'Unknown',
+      style: 'Unknown', // style and subStyle are removed
+      subStyle: 'Unknown',
       price: product.price.amount ? `${product.price.currencyCode} ${product.price.amount}` : 'Price not available',
       image: product.featuredImage?.url || '',
       colors: [], // Extract from variants if available
       sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], // Default sizes for now
       companyId: product.shop.id,
-      styleId: style?.id || '',
-      subStyleId: subStyle?.id || '',
+      styleId: '', // style and subStyle are removed
+      subStyleId: '',
       shopifyProduct: product // Keep reference to original Shopify data
     }))
-  }, [shopifyProducts, style?.name, style?.id, subStyle?.name, subStyle?.id])
+  }, [shopifyProducts])
+
+  // Apply filters to products
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      // Category filter
+      if (selectedCategory && !product.name.toLowerCase().includes(selectedCategory.toLowerCase())) {
+        return false
+      }
+      
+      // Gender filter (basic implementation)
+      if (selectedGender !== 'all') {
+        const productName = product.name.toLowerCase()
+        if (selectedGender === 'men' && (productName.includes('women') || productName.includes('female'))) {
+          return false
+        }
+        if (selectedGender === 'women' && (productName.includes('men') || productName.includes('male'))) {
+          return false
+        }
+      }
+      
+      // Price range filter
+      if (selectedPriceRange !== 'all') {
+        const price = parseFloat(product.price.replace(/[^0-9.]/g, ''))
+        if (!isNaN(price)) {
+          switch (selectedPriceRange) {
+            case 'budget':
+              if (price > 50) return false
+              break
+            case 'mid':
+              if (price < 50 || price > 150) return false
+              break
+            case 'premium':
+              if (price < 150 || price > 300) return false
+              break
+            case 'luxury':
+              if (price < 300) return false
+              break
+          }
+        }
+      }
+      
+      return true
+    })
+  }, [products, selectedCategory, selectedGender, selectedPriceRange])
 
   const isLoading = loading
   const useMockData = false // We're using real Shopify data now
   
   // Helper function to get match quality indicator
   const getMatchQuality = () => {
-    if (!company || !style || !subStyle) return 'all'
+    if (!company) return 'all'
     
     const exactMatches = products.filter(product => 
-      product.brand === company.name &&
-      product.style === style.name &&
-      product.subStyle === subStyle.name
+      product.brand === company.name
     )
     
     if (exactMatches.length > 0) return 'exact'
@@ -128,9 +145,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
     const partialMatches = products.filter(product => {
       let score = 0
       if (product.brand === company.name) score++
-      if (product.style === style.name) score++
-      if (product.subStyle === subStyle.name) score++
-      return score >= 2
+      return score >= 1
     })
     
     if (partialMatches.length > 0) return 'partial'
@@ -200,8 +215,8 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
                 <p>Query: "{finalSearchQuery}"</p>
                 <p>Filters: {JSON.stringify(filters)}</p>
                 <p>Company: {company?.name || 'undefined'}</p>
-                <p>Style: {style?.name || 'undefined'}</p>
-                <p>SubStyle: {subStyle?.name || 'undefined'}</p>
+                <p>Style: {company?.name || 'undefined'}</p>
+                <p>SubStyle: {company?.name || 'undefined'}</p>
               </div>
             </div>
             
@@ -223,49 +238,97 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
         <BackButton onClick={handleBack} />
         
         {/* Header with selection summary */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-white mb-2">Step 4: Choose Your Items</h1>
-
+        <div className="text-center mb-6 mt-8">
+          <h1 className="text-2xl font-bold text-white mb-2">Select Item</h1>
+        </div>
+        
+        {/* Filter Options */}
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
+          <h3 className="text-white font-semibold mb-3 text-center">Filter Options</h3>
           
+          {/* Category Filter */}
+          <div className="mb-3">
+            <label className="block text-white/80 text-sm mb-2">Category</label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/40"
+            >
+              <option value="">All Categories</option>
+              <option value="shirts">Shirts</option>
+              <option value="pants">Pants</option>
+              <option value="dresses">Dresses</option>
+              <option value="shoes">Shoes</option>
+              <option value="accessories">Accessories</option>
+              <option value="outerwear">Outerwear</option>
+            </select>
+          </div>
           
-          
-          
-          
-          {/* Search query and filters display */}
-          <div className="space-y-2 mb-4">
-            <div className="text-center space-y-1">
-                             {style?.name && (
-                 <div className="text-xs text-white/80">
-                   Category: {style.name} • Gender: {style.name.toLowerCase().includes('dress') || style.name.toLowerCase().includes('suit') ? 'Male' : style.name.toLowerCase().includes('dress') || style.name.toLowerCase().includes('skirt') ? 'Female' : 'Neutral'}
-                 </div>
-               )}
-               {/* Show when using fallback products */}
-               {!shopifyProducts && (
-                 <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
-                   No products found from main search
-                 </div>
-               )}
+          {/* Gender Filter */}
+          <div className="mb-3">
+            <label className="block text-white/80 text-sm mb-2">Gender</label>
+            <div className="flex gap-2">
+              {['all', 'men', 'women', 'unisex'].map((gender) => (
+                <button
+                  key={gender}
+                  onClick={() => setSelectedGender(gender)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    selectedGender === gender
+                      ? 'bg-white text-[#550cff]'
+                      : 'bg-white/20 text-white hover:bg-white/30'
+                  }`}
+                >
+                  {gender.charAt(0).toUpperCase() + gender.slice(1)}
+                </button>
+              ))}
             </div>
-            
+          </div>
+          
+          {/* Price Range Filter */}
+          <div className="mb-3">
+            <label className="block text-white/80 text-sm mb-2">Price Range</label>
+            <select
+              value={selectedPriceRange}
+              onChange={(e) => setSelectedPriceRange(e.target.value)}
+              className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/40"
+            >
+              <option value="all">All Prices</option>
+              <option value="budget">Budget ($0 - $50)</option>
+              <option value="mid">Mid-Range ($50 - $150)</option>
+              <option value="premium">Premium ($150 - $300)</option>
+              <option value="luxury">Luxury ($300+)</option>
+            </select>
+          </div>
+          
+          {/* Clear Filters Button */}
+          <div className="text-center">
+            <button
+              onClick={() => {
+                setSelectedCategory('')
+                setSelectedGender('all')
+                setSelectedPriceRange('all')
+              }}
+              className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all duration-200"
+            >
+              Clear All Filters
+            </button>
           </div>
         </div>
         
         {/* Products count */}
         <div className="mb-4">
           <p className="text-sm text-white/80 text-center">
-            {products.length} item{products.length !== 1 ? 's' : ''} available
+            {filteredProducts.length} item{filteredProducts.length !== 1 ? 's' : ''} available
           </p>
         </div>
         
         {/* Products grid */}
-        {products.length > 0 ? (
+        {filteredProducts.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 mb-6">
-            {products.map((item) => {
+            {filteredProducts.map((item) => {
               const isSelected = selectedItem?.id === item.id
-              const isExactMatch = company && style && subStyle && 
-                item.brand === company.name &&
-                item.style === style.name &&
-                item.subStyle === subStyle.name
+              const isExactMatch = company && 
+                item.brand === company.name
               
               return (
                 <div
@@ -331,11 +394,13 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
           </div>
         ) : (
           <div className="text-center py-8">
-
             <h3 className="text-lg font-medium text-white mb-2">No items found</h3>
-                         <p className="text-white/80 mb-4">
-               We couldn't find any items matching your exact criteria. This might be because the Shopify store doesn't have products matching your selections, or there might be a connection issue.
-             </p>
+            <p className="text-white/80 mb-4">
+              {selectedCategory || selectedGender !== 'all' || selectedPriceRange !== 'all'
+                ? "No items match your current filters. Try adjusting your filter selections or clearing all filters."
+                : "We couldn't find any items matching your criteria. This might be because the Shopify store doesn't have products matching your selections, or there might be a connection issue."
+              }
+            </p>
             <button
               onClick={handleBack}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"

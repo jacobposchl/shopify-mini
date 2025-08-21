@@ -69,8 +69,6 @@ export function useFlowState() {
   const goToNextStep = useCallback(() => {
     const stepOrder: FlowStep[] = [
       'company-selection',
-      'style-selection',
-      'substyle-selection',
       'clothing-selection',
       'measurements',
       'final-recommendation'
@@ -85,8 +83,6 @@ export function useFlowState() {
   const goToPreviousStep = useCallback(() => {
     const stepOrder: FlowStep[] = [
       'company-selection',
-      'style-selection',
-      'substyle-selection',
       'clothing-selection',
       'measurements',
       'final-recommendation'
