@@ -89,6 +89,12 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
   })
 
   // Transform Shopify products to our ClothingItem format
+  const formatPrice = (amount: string): string => {
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount)) return 'Price not available';
+    return `$${numericAmount.toFixed(2)}`;
+  }
+
   const products: ClothingItem[] = useMemo(() => {
     if (!shopifyProducts) return []
     
@@ -123,7 +129,9 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany, selec
         brand: product.shop.name,
         style: style?.name || 'Unknown',
         subStyle: subStyle?.name || 'Unknown',
-        price: product.price.amount ? `${product.price.currencyCode} ${product.price.amount}` : 'Price not available',
+        price: product.price.amount 
+          ? formatPrice(product.price.amount)
+          : 'Price not available',
         image: product.featuredImage?.url || '',
         colors: finalColors,
         sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], // Still using default sizes for now

@@ -240,6 +240,13 @@ export function useShopifyProducts(
     }
   }, [products, loading, error])
   
+  // Helper function to format the price
+  const formatPrice = (amount: string): string => {
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount)) return 'Price not available';
+    return `$${numericAmount.toFixed(2)}`;
+  }
+  
   // Transform Shopify products to our ClothingItem format
   const transformedShopifyProducts: ClothingItem[] = useMemo(() => {
     if (!products) return []
@@ -250,7 +257,9 @@ export function useShopifyProducts(
       brand: product.shop.name,
       style: style || 'Unknown',
       subStyle: subStyle || 'Unknown',
-      price: product.price.amount ? `${product.price.currencyCode} ${product.price.amount}` : 'Price not available',
+      price: product.price.amount 
+        ? formatPrice(product.price.amount)
+        : 'Price not available',
       image: product.featuredImage?.url || '',
       colors: extractProductColors(product),
       sizes: [], // Will handle sizes separately
@@ -304,15 +313,6 @@ export function useShopifyProducts(
       
       // This would require a new search, but for now we can filter the current results
       return finalProducts.filter(product => {
-        let matches = true
-        if (criteria.brand) matches = matches && product.brand.toLowerCase().includes(criteria.brand.toLowerCase())
-        if (criteria.style) matches = matches && product.style.toLowerCase().includes(criteria.style.toLowerCase())
-        if (criteria.subStyle) matches = matches && product.subStyle.toLowerCase().includes(criteria.subStyle.toLowerCase())
-        return matches
-      })
-    }
-  }
-}
         let matches = true
         if (criteria.brand) matches = matches && product.brand.toLowerCase().includes(criteria.brand.toLowerCase())
         if (criteria.style) matches = matches && product.style.toLowerCase().includes(criteria.style.toLowerCase())
