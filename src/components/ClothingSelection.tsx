@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react'
 import { useProductSearch } from '@shopify/shop-minis-react'
 import { BackButton } from './BackButton'
@@ -350,7 +349,15 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                   {/* Product image */}
                   <div className="aspect-square mb-3 rounded-md overflow-hidden bg-gray-100">
                     {item.image ? (
-                      <ProductImage src={item.image} alt={item.name} className="w-full h-full" />
+                      <ProductImage 
+                        src={item.image} 
+                        alt={item.name} 
+                        className="w-full h-full" 
+                        width={400}    // Increased from default
+                        height={400}   // Increased from default
+                        quality={90}   // Increased from default
+                        format="webp"
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400">
                         <span className="text-2xl">👕</span>

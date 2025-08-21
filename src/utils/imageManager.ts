@@ -62,10 +62,24 @@ export const optimizeImageUrl = (url: string, options: {
   if (url.includes('cdn.shopify.com')) {
     const params = new URLSearchParams()
     
-    if (options.width) params.append('width', options.width.toString())
-    if (options.height) params.append('height', options.height.toString())
-    if (options.quality) params.append('quality', options.quality.toString())
-    if (options.format) params.append('format', options.format)
+    // Set minimum dimensions to ensure quality
+    const minDimension = 400
+    params.append('width', String(Math.max(options.width || minDimension, minDimension)))
+    params.append('height', String(Math.max(options.height || minDimension, minDimension)))
+    
+    // Set quality (default to high quality)
+    params.append('quality', String(options.quality || 90))
+    
+    // Prefer WebP format for better quality/size ratio
+    if (!options.format) {
+      params.append('format', 'webp')
+    } else {
+      params.append('format', options.format)
+    }
+    
+    // Add crop and scale parameters for better image handling
+    params.append('crop', 'center')
+    params.append('fit', 'cover')
     
     const separator = url.includes('?') ? '&' : '?'
     return `${url}${separator}${params.toString()}`
