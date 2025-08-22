@@ -999,7 +999,7 @@ export function MeasurementsStepImpl({
       
       // Set transparency - make outlines more visible
       ctx.save()
-      ctx.globalAlpha = 0.85
+      ctx.globalAlpha = 0.50
       
       // Draw the image
       ctx.drawImage(img, x, y, targetWidth, targetHeight)
