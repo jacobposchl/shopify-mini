@@ -115,6 +115,29 @@ export const POSE_CONFIDENCE_REQUIREMENTS: ClothingPoseRequirements[] = [
         description: 'Knees visible for fit assessment'
       }
     ]
+  },
+  {
+    styleId: 'dresses',
+    requirements: [
+      {
+        keypointIndices: [5, 6], // leftShoulder, rightShoulder
+        minConfidence: 0.7,
+        requiredDuration: 3000, // 3 seconds
+        description: 'Shoulders visible and stable'
+      },
+      {
+        keypointIndices: [11, 12], // leftHip, rightHip
+        minConfidence: 0.7,
+        requiredDuration: 3000, // 3 seconds
+        description: 'Hips visible and stable'
+      },
+      {
+        keypointIndices: [0], // nose
+        minConfidence: 0.6,
+        requiredDuration: 2000, // 2 seconds
+        description: 'Face visible for full body alignment'
+      }
+    ]
   }
 ]
 
@@ -143,6 +166,7 @@ export function getClothingInstructions(styleId: string): string {
     'pants': 'Please ensure your lower body is in frame for measurements. Stand naturally with hips and legs visible.',
     'shorts': 'Please ensure your lower body is in frame for measurements. Stand naturally with hips and legs visible.',
     'jackets': 'Please ensure your upper body is in frame for measurements. Stand naturally with shoulders and arms visible.',
+    'dresses': 'Please ensure your full body is in frame for measurements. Stand naturally with shoulders and hips visible.',
     'activewear': 'Please ensure your full body is in frame for measurements. Stand naturally in an athletic pose.'
   }
   

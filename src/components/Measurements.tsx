@@ -9,6 +9,346 @@ import { ConfidenceThreshold } from './ConfidenceThreshold'
 import { getClothingInstructions } from '../data/poseRequirements'
 import { BackButton } from './BackButton'
 
+// Extend Window interface to include our custom property
+declare global {
+  interface Window {
+    outlineImage?: HTMLImageElement
+  }
+}
+
+// Style-specific outline configurations
+interface OutlineConfig {
+  bodyParts: string[]
+  focusArea: 'upper' | 'lower' | 'upper_extended' | 'full_body'
+  requiredLandmarks: number[]
+  idealShoulderWidth: number
+  minShoulderWidth: number
+  maxShoulderWidth: number
+  idealHipWidth: number
+  minHipWidth: number
+  maxHipWidth: number
+  confidenceThreshold: number
+}
+
+const OUTLINE_CONFIGS: Record<string, OutlineConfig> = {
+  shirts: {
+    bodyParts: ['head', 'shoulders', 'chest', 'arms'],
+    focusArea: 'upper',
+    requiredLandmarks: [0, 5, 6, 7, 8, 9, 10], // nose, shoulders, elbows, wrists
+    idealShoulderWidth: 150, // pixels at optimal distance
+    minShoulderWidth: 100,
+    maxShoulderWidth: 250,
+    idealHipWidth: 140,
+    minHipWidth: 90,
+    maxHipWidth: 220,
+    confidenceThreshold: 0.6
+  },
+  pants: {
+    bodyParts: ['hips', 'legs', 'knees', 'ankles'],
+    focusArea: 'lower', 
+    requiredLandmarks: [11, 12, 13, 14, 15, 16], // hips, knees, ankles
+    idealShoulderWidth: 150,
+    minShoulderWidth: 100,
+    maxShoulderWidth: 250,
+    idealHipWidth: 140,
+    minHipWidth: 90,
+    maxHipWidth: 220,
+    confidenceThreshold: 0.6
+  },
+  shorts: {
+    bodyParts: ['hips', 'legs', 'knees'],
+    focusArea: 'lower',
+    requiredLandmarks: [11, 12, 13, 14], // hips, knees
+    idealShoulderWidth: 150,
+    minShoulderWidth: 100,
+    maxShoulderWidth: 250,
+    idealHipWidth: 140,
+    minHipWidth: 90,
+    maxHipWidth: 220,
+    confidenceThreshold: 0.6
+  },
+  jackets: {
+    bodyParts: ['head', 'shoulders', 'chest', 'arms', 'torso'],
+    focusArea: 'upper_extended', 
+    requiredLandmarks: [0, 5, 6, 7, 8, 9, 10, 11, 12],
+    idealShoulderWidth: 150,
+    minShoulderWidth: 100, 
+    maxShoulderWidth: 250,
+    idealHipWidth: 140,
+    minHipWidth: 90,
+    maxHipWidth: 220,
+    confidenceThreshold: 0.6
+  },
+  dresses: {
+    bodyParts: ['head', 'shoulders', 'chest', 'torso', 'hips'],
+    focusArea: 'full_body',
+    requiredLandmarks: [0, 5, 6, 11, 12, 13, 14],
+    idealShoulderWidth: 150,
+    minShoulderWidth: 100,
+    maxShoulderWidth: 250,
+    idealHipWidth: 140,
+    minHipWidth: 90,
+    maxHipWidth: 220,
+    confidenceThreshold: 0.6
+  },
+  activewear: {
+    bodyParts: ['head', 'shoulders', 'chest', 'torso', 'hips', 'legs'],
+    focusArea: 'full_body',
+    requiredLandmarks: [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+    idealShoulderWidth: 150,
+    minShoulderWidth: 100,
+    maxShoulderWidth: 250,
+    idealHipWidth: 140,
+    minHipWidth: 90,
+    maxHipWidth: 220,
+    confidenceThreshold: 0.6
+  }
+}
+
+// Style-specific outline drawing functions
+const drawUpperBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+  ctx.save()
+  ctx.globalAlpha = alpha
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 2
+  
+  const headRadius = 25 * scale
+  const shoulderWidth = 120 * scale
+  const chestHeight = 80 * scale
+  const armLength = 100 * scale
+  
+  // Head
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, headRadius, 0, 2 * Math.PI)
+  ctx.stroke()
+  
+  // Shoulders
+  const shoulderY = centerY + headRadius + 10
+  ctx.beginPath()
+  ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
+  ctx.lineTo(centerX + shoulderWidth/2, shoulderY)
+  ctx.stroke()
+  
+  // Chest/torso
+  ctx.beginPath()
+  ctx.rect(centerX - shoulderWidth/3, shoulderY, shoulderWidth * 2/3, chestHeight)
+  ctx.stroke()
+  
+  // Arms
+  ctx.beginPath()
+  ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
+  ctx.lineTo(centerX - shoulderWidth/2 - 20, shoulderY + armLength/2)
+  ctx.lineTo(centerX - shoulderWidth/2 - 10, shoulderY + armLength)
+  ctx.stroke()
+  
+  ctx.beginPath()
+  ctx.moveTo(centerX + shoulderWidth/2, shoulderY)
+  ctx.lineTo(centerX + shoulderWidth/2 + 20, shoulderY + armLength/2)
+  ctx.lineTo(centerX + shoulderWidth/2 + 10, shoulderY + armLength)
+  ctx.stroke()
+  
+  ctx.restore()
+}
+
+const drawLowerBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+  ctx.save()
+  ctx.globalAlpha = alpha
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 2
+  
+  const hipWidth = 100 * scale
+  const legLength = 160 * scale
+  const legWidth = 25 * scale
+  
+  // Hips
+  ctx.beginPath()
+  ctx.rect(centerX - hipWidth/2, centerY, hipWidth, 40 * scale)
+  ctx.stroke()
+  
+  // Legs
+  const legY = centerY + 40 * scale
+  ctx.beginPath()
+  ctx.rect(centerX - hipWidth/3, legY, legWidth, legLength)
+  ctx.stroke()
+  
+  ctx.beginPath()
+  ctx.rect(centerX + hipWidth/3 - legWidth, legY, legWidth, legLength)
+  ctx.stroke()
+  
+  ctx.restore()
+}
+
+const drawFullBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+  // Draw both upper and lower body
+  drawUpperBodyOutline(ctx, centerX, centerY, scale, alpha)
+  drawLowerBodyOutline(ctx, centerX, centerY + 120 * scale, scale, alpha)
+}
+
+const drawUpperExtendedOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+  ctx.save()
+  ctx.globalAlpha = alpha
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 2
+  
+  const headRadius = 25 * scale
+  const shoulderWidth = 120 * scale
+  const chestHeight = 100 * scale
+  const armLength = 100 * scale
+  const torsoHeight = 60 * scale
+  
+  // Head
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, headRadius, 0, 2 * Math.PI)
+  ctx.stroke()
+  
+  // Shoulders
+  const shoulderY = centerY + headRadius + 10
+  ctx.beginPath()
+  ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
+  ctx.lineTo(centerX + shoulderWidth/2, shoulderY)
+  ctx.stroke()
+  
+  // Chest/torso
+  ctx.beginPath()
+  ctx.rect(centerX - shoulderWidth/3, shoulderY, shoulderWidth * 2/3, chestHeight)
+  ctx.stroke()
+  
+  // Extended torso
+  const torsoY = shoulderY + chestHeight
+  ctx.beginPath()
+  ctx.rect(centerX - shoulderWidth/4, torsoY, shoulderWidth * 1/2, torsoHeight)
+  ctx.stroke()
+  
+  // Arms
+  ctx.beginPath()
+  ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
+  ctx.lineTo(centerX - shoulderWidth/2 - 20, shoulderY + armLength/2)
+  ctx.lineTo(centerX - shoulderWidth/2 - 10, shoulderY + armLength)
+  ctx.stroke()
+  
+  ctx.beginPath()
+  ctx.moveTo(centerX + shoulderWidth/2, shoulderY)
+  ctx.lineTo(centerX + shoulderWidth/2 + 20, shoulderY + armLength/2)
+  ctx.lineTo(centerX + shoulderWidth/2 + 10, shoulderY + armLength)
+  ctx.stroke()
+  
+  ctx.restore()
+}
+
+// Position feedback interface and analysis
+interface PositionFeedback {
+  isInFrame: boolean
+  isCorrectDistance: boolean
+  isProperlyAligned: boolean
+  feedbackMessage: string
+  feedbackType: 'success' | 'warning' | 'error'
+  adjustmentNeeded: 'move_back' | 'move_closer' | 'center_yourself' | 'good' | 'raise_camera' | 'lower_camera'
+}
+
+const analyzeUserPosition = (
+  poseResults: any, 
+  selectedStyleId: string, 
+  canvasWidth: number, 
+  canvasHeight: number
+): PositionFeedback => {
+  
+  const defaultFeedback: PositionFeedback = {
+    isInFrame: false,
+    isCorrectDistance: false,
+    isProperlyAligned: false,
+    feedbackMessage: "Stand in front of camera",
+    feedbackType: 'error',
+    adjustmentNeeded: 'center_yourself'
+  }
+
+  if (!poseResults?.isDetected || !poseResults.landmarks.length) {
+    return defaultFeedback
+  }
+
+  const config = OUTLINE_CONFIGS[selectedStyleId as keyof typeof OUTLINE_CONFIGS] || OUTLINE_CONFIGS.shirts
+  const landmarks = poseResults.landmarks
+  
+  // Check if required landmarks are visible and confident
+  const visibleLandmarks = config.requiredLandmarks.filter(index => 
+    landmarks[index] && landmarks[index].confidence > config.confidenceThreshold
+  )
+  
+  const isInFrame = visibleLandmarks.length >= config.requiredLandmarks.length * 0.8
+
+  if (!isInFrame) {
+    return {
+      ...defaultFeedback,
+      feedbackMessage: "Please step into camera view",
+      adjustmentNeeded: 'center_yourself'
+    }
+  }
+
+  // Calculate distance based on key measurement
+  let currentWidth = 0
+  let idealWidth = 0
+  let minWidth = 0
+  let maxWidth = 0
+
+  if (config.focusArea.includes('upper')) {
+    // Use shoulder width for upper body measurements
+    if (landmarks[5] && landmarks[6]) {
+      currentWidth = Math.abs(landmarks[5].x - landmarks[6].x) * canvasWidth
+      idealWidth = config.idealShoulderWidth
+      minWidth = config.minShoulderWidth
+      maxWidth = config.maxShoulderWidth
+    }
+  } else {
+    // Use hip width for lower body measurements  
+    if (landmarks[11] && landmarks[12]) {
+      currentWidth = Math.abs(landmarks[11].x - landmarks[12].x) * canvasWidth
+      idealWidth = config.idealHipWidth
+      minWidth = config.minHipWidth
+      maxWidth = config.maxHipWidth
+    }
+  }
+
+  // Distance analysis
+  const isCorrectDistance = currentWidth >= minWidth && currentWidth <= maxWidth
+  const isTooClose = currentWidth > maxWidth
+  const isTooFar = currentWidth < minWidth
+
+  // Alignment analysis (check if person is centered)
+  const bodyCenter = landmarks[0] ? landmarks[0].x : 0.5 // Use nose as center reference
+  const isProperlyAligned = Math.abs(bodyCenter - 0.5) < 0.15 // Within 15% of center
+
+  // Generate feedback
+  let feedbackMessage = ""
+  let feedbackType: 'success' | 'warning' | 'error' = 'success'
+  let adjustmentNeeded: PositionFeedback['adjustmentNeeded'] = 'good'
+
+  if (!isProperlyAligned) {
+    feedbackMessage = "Please center yourself in the frame"
+    feedbackType = 'warning'
+    adjustmentNeeded = 'center_yourself'
+  } else if (isTooClose) {
+    feedbackMessage = "Please step back from the camera"
+    feedbackType = 'warning'  
+    adjustmentNeeded = 'move_back'
+  } else if (isTooFar) {
+    feedbackMessage = "Please move closer to the camera"
+    feedbackType = 'warning'
+    adjustmentNeeded = 'move_closer'
+  } else {
+    feedbackMessage = "Perfect position! Hold still."
+    feedbackType = 'success'
+    adjustmentNeeded = 'good'
+  }
+
+  return {
+    isInFrame,
+    isCorrectDistance,
+    isProperlyAligned,
+    feedbackMessage,
+    feedbackType,
+    adjustmentNeeded
+  }
+}
+
 // Error boundary component
 class InAppErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -205,6 +545,36 @@ export function MeasurementsStepImpl({
   selectedSubStyleName,
   selectedStyleId,
 }: MeasurementsStepProps) {
+  // Simple clothing type detection based on product name
+  const getOutlineForClothingType = (productName?: string): string => {
+    if (!productName) return '/skeleton_outline.png'
+    
+    const nameLower = productName.toLowerCase()
+    
+    // Top items (shirts, jackets, sweaters, etc.)
+    const topKeywords = [
+      'shirt', 't-shirt', 'tshirt', 'top', 'blouse', 'polo', 'sweater', 'hoodie', 'jacket', 'coat', 'blazer', 'vest', 'tank', 'crop'
+    ]
+    
+    // Bottom items (pants, shorts, skirts, etc.)
+    const bottomKeywords = [
+      'pants', 'jeans', 'trousers', 'slacks', 'shorts', 'skirt', 'leggings', 'joggers', 'sweatpants'
+    ]
+    
+    // Check if it's a top item
+    if (topKeywords.some(keyword => nameLower.includes(keyword))) {
+      return '/upper-body-outline.png'
+    }
+    
+    // Check if it's a bottom item
+    if (bottomKeywords.some(keyword => nameLower.includes(keyword))) {
+      return '/lower-body-outline.png'
+    }
+    
+    // Default to full body outline
+    return '/skeleton_outline.png'
+  }
+
   // --- helpers to compute distances/measurements ---
   const calculateDistance = (landmark1: any, landmark2: any, scale: number) => {
     const pixelDistance = Math.sqrt(
@@ -293,6 +663,7 @@ export function MeasurementsStepImpl({
   const [measurementBuffer, setMeasurementBuffer] = useState<Measurements[]>([])
   const [debugBufferSize, setDebugBufferSize] = useState(0)
   const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
+  const [positionFeedback, setPositionFeedback] = useState<PositionFeedback | null>(null)
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const {
@@ -306,6 +677,7 @@ export function MeasurementsStepImpl({
     cleanup,
     poseStability,
     setSelectedStyle,
+    updatePositionFeedback,
   } = usePoseDetectionTF(10)
 
   // Pose validation hook
@@ -350,6 +722,16 @@ export function MeasurementsStepImpl({
       }
     }
   }, [poseResults, validation?.progress, poseStability?.isStable, selectedStyleId])
+
+  // Update position feedback when pose results change
+  useEffect(() => {
+    if (canvasRef.current && poseResults && selectedStyleId) {
+      const feedback = analyzeUserPosition(poseResults, selectedStyleId, canvasRef.current.width, canvasRef.current.height)
+      setPositionFeedback(feedback)
+      // Also update the pose detection hook with position feedback for stability calculations
+      updatePositionFeedback(feedback)
+    }
+  }, [poseResults, selectedStyleId, updatePositionFeedback])
 
   useEffect(() => {
     if (!validation || validation.progress === 0 || !poseStability?.isStable) {
@@ -433,30 +815,31 @@ export function MeasurementsStepImpl({
   useEffect(() => {
     setDebugEffectCount((prev) => prev + 1)
 
-    if (validation && validation.isValid && validation.progress >= 1.0 && !measurements && !debugAutoTrigger) {
-      setDebugAutoTrigger(true)
+    // COMMENTED OUT: Auto-progress when validation reaches 100%
+    // if (validation && validation.isValid && validation.progress >= 1.0 && !measurements && !debugAutoTrigger) {
+    //   setDebugAutoTrigger(true)
 
-      try {
-        const averaged = averageMeasurements(measurementBuffer)
-        setMeasurements(averaged)
-        if (!isDemoMode) stopCamera()
-        onMeasurementsComplete(averaged)
-      } catch (error) {
-        setDebugError((error as Error).message)
-        const fallback = {
-          chest: 42,
-          waist: 32,
-          hips: 38,
-          shoulders: 18,
-          armLength: 25,
-          inseam: 32,
-          height: 70,
-          weight: 165,
-        }
-        setMeasurements(fallback)
-        onMeasurementsComplete(fallback)
-      }
-    }
+    //   try {
+    //     const averaged = averageMeasurements(measurementBuffer)
+    //     setMeasurements(averaged)
+    //     if (!isDemoMode) stopCamera()
+    //     onMeasurementsComplete(averaged)
+    //   } catch (error) {
+    //     setDebugError((error as Error).message)
+    //     const fallback = {
+    //       chest: 42,
+    //       waist: 32,
+    //       hips: 38,
+    //       shoulders: 18,
+    //       armLength: 25,
+    //       inseam: 32,
+    //       height: 70,
+    //       weight: 165,
+    //     }
+    //     setMeasurements(fallback)
+    //     onMeasurementsComplete(fallback)
+    //   }
+    // }
 
     if (!validation || !validation.isValid || validation.progress < 1.0) {
       setDebugAutoTrigger(false)
@@ -543,100 +926,241 @@ export function MeasurementsStepImpl({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    const drawHumanGuide = () => {
-      ctx.save()
+  
+  
 
+    
+    // Draw style-specific outline image
+    const drawStyleSpecificOutline = () => {
+      console.log('Drawing style-specific outline for product:', selectedItemName)
+      
+      // Get the appropriate outline image based on clothing type
+      const imagePath = getOutlineForClothingType(selectedItemName || '')
+      console.log('Selected outline image:', imagePath, 'for product:', selectedItemName)
+      
+      // Create or get the appropriate image element
+      if (!window.outlineImage || window.outlineImage.src !== window.location.origin + imagePath) {
+        if (window.outlineImage) {
+          window.outlineImage.onload = null // Remove old event listeners
+        }
+        window.outlineImage = new Image()
+        window.outlineImage.src = imagePath
+        window.outlineImage.onload = () => {
+          console.log('Outline image loaded successfully:', imagePath)
+          // Redraw the outline once image is loaded
+          if (canvasRef.current && window.outlineImage) {
+            const canvas = canvasRef.current
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+              drawOutlineToCanvas(ctx, canvas, window.outlineImage)
+            }
+          }
+        }
+        window.outlineImage.onerror = (err) => {
+          console.error('Failed to load outline image:', imagePath, err)
+        }
+      }
+      
+      // Draw the image if it's loaded
+      if (window.outlineImage && window.outlineImage.complete && window.outlineImage.naturalHeight !== 0) {
+        drawOutlineToCanvas(ctx, canvas, window.outlineImage)
+      }
+    }
+    
+    const drawOutlineToCanvas = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, img: HTMLImageElement) => {
+      if (!img) return
+      
+      // Determine if this is a top or bottom item
+      const isTopItem = getOutlineForClothingType(selectedItemName || '') === '/upper-body-outline.png'
+      
+      // Calculate position and scale
       const centerX = canvas.width / 2
-      const totalHeight = canvas.height * 0.75
-      const headHeight = totalHeight / 8
-      const startY = canvas.height * 0.15
+      let centerY: number
+      
+      if (isTopItem) {
+        // Top items: center of screen
+        centerY = canvas.height * 0.5
+      } else {
+        // Bottom items: align to bottom of screen
+        centerY = canvas.height * 0.8
+      }
+      
+      // Scale image to fit nicely on screen (adjust these values as needed)
+      const targetWidth = 200
+      const targetHeight = (img.height / img.width) * targetWidth
+      
+      // Position image centered horizontally and at calculated Y position
+      const x = centerX - targetWidth / 2
+      const y = centerY - targetHeight / 2
+      
+      // Set transparency
+      ctx.save()
+      ctx.globalAlpha = 0.6
+      
+      // Draw the image
+      ctx.drawImage(img, x, y, targetWidth, targetHeight)
+      
+      ctx.restore()
+      console.log('Outline drawn successfully for', isTopItem ? 'top' : 'bottom', 'item')
+    }
+    
 
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'
+
+    // Define outline drawing functions locally for this canvas context
+    const drawUpperBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+      console.log('Drawing upper body outline at:', centerX, centerY, 'scale:', scale, 'alpha:', alpha)
+      ctx.save()
+      ctx.globalAlpha = alpha
+      ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 3
-      ctx.setLineDash([8, 4])
-
-      const headWidth = headHeight * 0.7
-      const headCenterY = startY + headHeight / 2
+      
+      const headRadius = 25 * scale
+      const shoulderWidth = 120 * scale
+      const chestHeight = 80 * scale
+      const armLength = 100 * scale
+      
+      // Head
       ctx.beginPath()
-      ctx.ellipse(centerX, headCenterY, headWidth / 2, headHeight / 2, 0, 0, 2 * Math.PI)
+      ctx.arc(centerX, centerY, headRadius, 0, 2 * Math.PI)
       ctx.stroke()
-
-      const neckStartY = startY + headHeight
-      const neckEndY = neckStartY + headHeight * 0.4
+      
+      // Shoulders
+      const shoulderY = centerY + headRadius + 10
       ctx.beginPath()
-      ctx.moveTo(centerX, neckStartY)
-      ctx.lineTo(centerX, neckEndY)
+      ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
+      ctx.lineTo(centerX + shoulderWidth/2, shoulderY)
       ctx.stroke()
-
-      const shoulderY = neckEndY + headHeight * 1
-      const shoulderWidth = headHeight * 2.2
+      
+      // Chest/torso
       ctx.beginPath()
-      ctx.arc(centerX, shoulderY, shoulderWidth / 2, Math.PI, 0, false)
+      ctx.rect(centerX - shoulderWidth/3, shoulderY, shoulderWidth * 2/3, chestHeight)
       ctx.stroke()
-
-      const waistY = shoulderY + headHeight * 2
-      const hipY = shoulderY + headHeight * 2.8
-      const waistWidth = shoulderWidth * 0.7
-      const hipWidth = shoulderWidth * 0.9
-
+      
+      // Arms
       ctx.beginPath()
-      ctx.moveTo(centerX - shoulderWidth / 2, shoulderY)
-      ctx.quadraticCurveTo(centerX - waistWidth / 2, waistY, centerX - hipWidth / 2, hipY)
+      ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
+      ctx.lineTo(centerX - shoulderWidth/2 - 20, shoulderY + armLength/2)
+      ctx.lineTo(centerX - shoulderWidth/2 - 10, shoulderY + armLength)
       ctx.stroke()
-
+      
       ctx.beginPath()
-      ctx.moveTo(centerX + shoulderWidth / 2, shoulderY)
-      ctx.quadraticCurveTo(centerX + waistWidth / 2, waistY, centerX + hipWidth / 2, hipY)
+      ctx.moveTo(centerX + shoulderWidth/2, shoulderY)
+      ctx.lineTo(centerX + shoulderWidth/2 + 20, shoulderY + armLength/2)
+      ctx.lineTo(centerX + shoulderWidth/2 + 10, shoulderY + armLength)
       ctx.stroke()
-
-      const elbowY = shoulderY + headHeight * 1.5
-      const wristY = shoulderY + headHeight * 2.5
-      const armWidth = headHeight * 0.3
-
-      ctx.beginPath()
-      ctx.moveTo(centerX - shoulderWidth / 2, shoulderY)
-      ctx.lineTo(centerX - shoulderWidth / 2 - armWidth, elbowY)
-      ctx.lineTo(centerX - shoulderWidth / 2 - armWidth * 0.5, wristY)
-      ctx.stroke()
-
-      ctx.beginPath()
-      ctx.moveTo(centerX + shoulderWidth / 2, shoulderY)
-      ctx.lineTo(centerX + shoulderWidth / 2 + armWidth, elbowY)
-      ctx.lineTo(centerX + shoulderWidth / 2 + armWidth * 0.5, wristY)
-      ctx.stroke()
-
-      const legWidth = headHeight * 0.4
-      const kneeY = hipY + headHeight * 2
-      const maxAnkleY = startY + totalHeight
-      const ankleY = Math.min(hipY + headHeight * 4, maxAnkleY)
-
-      ctx.beginPath()
-      ctx.moveTo(centerX - hipWidth / 4, hipY)
-      ctx.lineTo(centerX - legWidth / 2, kneeY)
-      ctx.lineTo(centerX - legWidth / 3, ankleY)
-      ctx.stroke()
-
-      ctx.beginPath()
-      ctx.moveTo(centerX + hipWidth / 4, hipY)
-      ctx.lineTo(centerX + legWidth / 2, kneeY)
-      ctx.lineTo(centerX + legWidth / 3, ankleY)
-      ctx.stroke()
-
+      
+      console.log('Upper body outline drawn successfully')
       ctx.restore()
     }
 
-    drawHumanGuide()
+    const drawLowerBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+      ctx.save()
+      ctx.globalAlpha = alpha
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 3
+      
+      const hipWidth = 100 * scale
+      const legLength = 160 * scale
+      const legWidth = 25 * scale
+      
+      // Hips
+      ctx.beginPath()
+      ctx.rect(centerX - hipWidth/2, centerY, hipWidth, 40 * scale)
+      ctx.stroke()
+      
+      // Legs
+      const legY = centerY + 40 * scale
+      ctx.beginPath()
+      ctx.rect(centerX - hipWidth/3, legY, legWidth, legLength)
+      ctx.stroke()
+      
+      ctx.beginPath()
+      ctx.rect(centerX + hipWidth/3 - legWidth, legY, legWidth, legLength)
+      ctx.stroke()
+      
+      ctx.restore()
+    }
 
+    const drawFullBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+      // Draw both upper and lower body
+      drawUpperBodyOutline(ctx, centerX, centerY, scale, alpha)
+      drawLowerBodyOutline(ctx, centerX, centerY + 120 * scale, scale, alpha)
+    }
+
+    const drawUpperExtendedOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+      ctx.save()
+      ctx.globalAlpha = alpha
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 3
+      
+      const headRadius = 25 * scale
+      const shoulderWidth = 120 * scale
+      const chestHeight = 100 * scale
+      const armLength = 100 * scale
+      const torsoHeight = 60 * scale
+      
+      // Head
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, headRadius, 0, 2 * Math.PI)
+      ctx.stroke()
+      
+      // Shoulders
+      const shoulderY = centerY + headRadius + 10
+      ctx.beginPath()
+      ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
+      ctx.lineTo(centerX + shoulderWidth/2, shoulderY)
+      ctx.stroke()
+      
+      // Chest/torso
+      ctx.beginPath()
+      ctx.rect(centerX - shoulderWidth/3, shoulderY, shoulderWidth * 2/3, chestHeight)
+      ctx.stroke()
+      
+      // Extended torso
+      const torsoY = shoulderY + chestHeight
+      ctx.beginPath()
+      ctx.rect(centerX - shoulderWidth/4, torsoY, shoulderWidth * 1/2, torsoHeight)
+      ctx.stroke()
+      
+      // Arms
+      ctx.beginPath()
+      ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
+      ctx.lineTo(centerX - shoulderWidth/2 - 20, shoulderY + armLength/2)
+      ctx.lineTo(centerX - shoulderWidth/2 - 10, shoulderY + armLength)
+      ctx.stroke()
+      
+      ctx.beginPath()
+      ctx.moveTo(centerX + shoulderWidth/2, shoulderY)
+      ctx.lineTo(centerX + shoulderWidth/2 + 20, shoulderY + armLength/2)
+      ctx.lineTo(centerX + shoulderWidth/2 + 10, shoulderY + armLength)
+      ctx.stroke()
+      
+      ctx.restore()
+    }
+
+         // Draw style-specific outline first (behind everything)
+     drawStyleSpecificOutline()
+
+    // Then draw pose landmarks and skeleton on top
     ctx.strokeStyle = '#00ff00'
     ctx.lineWidth = 2
     ctx.fillStyle = '#00ff00'
 
+    // Determine which joints to highlight based on clothing type
+    const isTopItem = getOutlineForClothingType(selectedItemName || '') === '/upper-body-outline.png'
+    
+    // Define relevant joints for top vs bottom items
+    const topItemJoints = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // nose, eyes, ears, shoulders, elbows, wrists
+    const bottomItemJoints = [0, 11, 12, 13, 14, 15, 16] // nose, hips, knees, ankles
+    
+    const relevantJoints = isTopItem ? topItemJoints : bottomItemJoints
+    
     poseResults.landmarks.forEach((landmark: any, index: number) => {
       if (landmark.confidence > 0.3) {
         const x = canvas.width - (landmark.x * scale + offsetX)
         const y = landmark.y * scale + offsetY
 
-        const isRelevant = poseStability?.relevantLandmarks.includes(index) ?? false
+        const isRelevant = relevantJoints.includes(index)
 
         ctx.fillStyle = isRelevant ? '#00ff00' : '#666666'
         ctx.beginPath()
@@ -680,8 +1204,7 @@ export function MeasurementsStepImpl({
         const y2 = landmark2.y * scale + offsetY
 
         const isRelevant =
-          (poseStability?.relevantLandmarks.includes(index1) ?? false) &&
-          (poseStability?.relevantLandmarks.includes(index2) ?? false)
+          relevantJoints.includes(index1) && relevantJoints.includes(index2)
 
         ctx.strokeStyle = isRelevant ? '#00ff00' : '#666666'
         ctx.lineWidth = isRelevant ? 3 : 1
@@ -1272,6 +1795,19 @@ export function MeasurementsStepImpl({
           poseStability={poseStability}
         />
 
+        {/* Position feedback */}
+        {positionFeedback && !isDemoMode && !measurements && !isProcessing && (
+          <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg font-medium text-center max-w-xs z-40 ${
+            positionFeedback.feedbackType === 'success' 
+              ? 'bg-green-500/90 text-white' 
+              : positionFeedback.feedbackType === 'warning'
+              ? 'bg-yellow-500/90 text-black'
+              : 'bg-red-500/90 text-white'
+          }`}>
+            {positionFeedback.feedbackMessage}
+          </div>
+        )}
+
         {isDemoMode ? (
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
             <div className="text-white text-center p-8">
@@ -1331,9 +1867,11 @@ export function MeasurementsStepImpl({
           </div>
         )}
 
+
+
         {/* Clothing instructions */}
         {!isDemoMode && !measurements && !isProcessing && selectedStyleId && (
-          <div className="absolute bottom-20 left-0 right-0 z-20 px-4">
+          <div className="absolute bottom-20 left-0 right-0 z-20 px-20">
             <div className="bg-black/60 backdrop-blur-sm text-white text-center py-3 px-4 rounded-lg">
               <p className="text-sm font-medium">{getClothingInstructions(selectedStyleId)}</p>
             </div>

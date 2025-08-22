@@ -27,6 +27,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
   const [poseStability, setPoseStability] = useState<PoseStability | null>(null)
+  const [positionFeedback, setPositionFeedback] = useState<any>(null)
 
   // Use 'any' type for now to avoid type conflicts, or we can use the actual return type from posenet.load()
   const modelRef = useRef<any>(null)
@@ -58,18 +59,37 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
 
   // Function to get relevant landmarks for clothing type
   const getRelevantLandmarks = useCallback((styleId: string): number[] => {
-    const landmarkMap: { [key: string]: number[] } = {
-      'shirts': [5, 6, 7, 8, 11, 12], // shoulders, elbows, hips
-      'pants': [11, 12, 13, 14, 15, 16], // hips, knees, ankles
-      'shorts': [11, 12, 13, 14], // hips, knees
-      'jackets': [5, 6, 7, 8, 11, 12], // shoulders, elbows, hips
-      'activewear': [5, 6, 11, 12, 13, 14] // shoulders, hips, knees
+    // Simple top vs bottom logic - same as in Measurements component
+    if (!styleId) return [0, 5, 6, 11, 12] // default to nose, shoulders, and hips
+    
+    const styleIdLower = styleId.toLowerCase()
+    
+    // Top items (shirts, jackets, sweaters, etc.)
+    const topKeywords = [
+      'shirt', 't-shirt', 'tshirt', 'top', 'blouse', 'polo', 'sweater', 'hoodie', 'jacket', 'coat', 'blazer', 'vest', 'tank', 'crop'
+    ]
+    
+    // Bottom items (pants, shorts, skirts, etc.)
+    const bottomKeywords = [
+      'pants', 'jeans', 'trousers', 'slacks', 'shorts', 'skirt', 'leggings', 'joggers', 'sweatpants'
+    ]
+    
+    // Check if it's a top item
+    if (topKeywords.some(keyword => styleIdLower.includes(keyword))) {
+      return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // nose, eyes, ears, shoulders, elbows, wrists
     }
-    return landmarkMap[styleId] || [5, 6, 11, 12] // default to shoulders and hips
+    
+    // Check if it's a bottom item
+    if (bottomKeywords.some(keyword => styleIdLower.includes(keyword))) {
+      return [0, 11, 12, 13, 14, 15, 16] // nose, hips, knees, ankles
+    }
+    
+    // Default to nose, shoulders, and hips
+    return [0, 5, 6, 11, 12]
   }, [])
 
   // Function to calculate pose stability with configurable threshold
-  const calculatePoseStability = useCallback((currentLandmarks: Array<{ x: number; y: number; confidence: number }>, styleId: string, stabilityThreshold: number = 200): PoseStability => {
+  const calculatePoseStability = useCallback((currentLandmarks: Array<{ x: number; y: number; confidence: number }>, styleId: string, stabilityThreshold: number = 200, positionFeedback?: any): PoseStability => {
     const relevantLandmarks = getRelevantLandmarks(styleId)
     const currentVelocities = new Map<number, number>()
     let totalVelocity = 0
@@ -102,10 +122,15 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
     const avgVelocity = validLandmarks > 0 ? totalVelocity / validLandmarks : 0
     
     // Check if current frame is stable with some hysteresis
-    const isCurrentFrameStable = avgVelocity <= stabilityThreshold && validLandmarks >= relevantLandmarks.length * 0.7
+    // More lenient threshold since we're tracking more comprehensive landmarks
+    const isCurrentFrameStable = avgVelocity <= stabilityThreshold && validLandmarks >= relevantLandmarks.length * 0.6
+    
+    // Only consider frame stable if user is properly positioned
+    const isProperlyPositioned = !positionFeedback || positionFeedback.feedbackType === 'success'
+    const isCurrentFrameStableAndPositioned = isCurrentFrameStable && isProperlyPositioned
     
     // Update stability tracking with hysteresis to prevent flickering
-    if (isCurrentFrameStable) {
+    if (isCurrentFrameStableAndPositioned) {
       if (consecutiveStableFramesRef.current === 0) {
         // Start stability timer
         stabilityStartTimeRef.current = now
@@ -113,7 +138,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
       consecutiveStableFramesRef.current++
     } else {
       // Only reset if we're significantly unstable (add hysteresis)
-      if (avgVelocity > stabilityThreshold * 1.5) {
+      if (avgVelocity > stabilityThreshold * 1.5 || !isProperlyPositioned) {
         consecutiveStableFramesRef.current = 0
         stabilityStartTimeRef.current = 0
       }
@@ -125,8 +150,8 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
     // Calculate stability score based on consecutive stable frames
     const stabilityScore = Math.min(consecutiveStableFramesRef.current / requiredFrames, 1.0)
     
-    // Consider pose stable if we have enough consecutive stable frames
-    const isStable = consecutiveStableFramesRef.current >= requiredFrames
+    // Consider pose stable if we have enough consecutive stable frames AND user is properly positioned
+    const isStable = consecutiveStableFramesRef.current >= requiredFrames && isProperlyPositioned
 
     return {
       isStable,
@@ -138,7 +163,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
   }, [getRelevantLandmarks])
 
   // Function to update pose stability
-  const updatePoseStability = useCallback((landmarks: Array<{ x: number; y: number; confidence: number }>, styleId: string, stabilityThreshold: number = 200) => {
+  const updatePoseStability = useCallback((landmarks: Array<{ x: number; y: number; confidence: number }>, styleId: string, stabilityThreshold: number = 200, positionFeedback?: any) => {
     if (landmarks.length === 0) {
       setPoseStability(null)
       return
@@ -147,7 +172,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
     // Use default style if none provided
     const effectiveStyleId = styleId || 'shirts' // Default to shirts if no style selected
     
-    const stability = calculatePoseStability(landmarks, effectiveStyleId, stabilityThreshold)
+    const stability = calculatePoseStability(landmarks, effectiveStyleId, stabilityThreshold, positionFeedback)
     setPoseStability(stability)
     
     // Update previous landmarks for next frame
@@ -413,7 +438,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
         })
 
         // Update pose stability
-        updatePoseStability(landmarks, selectedStyleIdRef.current || 'shirts', stabilityThreshold)
+        updatePoseStability(landmarks, selectedStyleIdRef.current || 'shirts', stabilityThreshold, positionFeedback)
 
       } else {
         // No pose found, but don't log this as an error
@@ -555,6 +580,11 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
     }
   }, [])
 
+  // Function to update position feedback for stability calculations
+  const updatePositionFeedback = useCallback((feedback: any) => {
+    setPositionFeedback(feedback)
+  }, [])
+
   return {
     poseResults,
     isInitialized,
@@ -567,7 +597,9 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
     getHealthStatus,
     poseStability,
     setSelectedStyle,
-    resetPoseStability
+    resetPoseStability,
+    updatePositionFeedback,
+    positionFeedback
   }
 }
 
