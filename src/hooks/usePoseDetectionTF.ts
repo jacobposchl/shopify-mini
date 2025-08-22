@@ -76,7 +76,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
     
     // Check if it's a top item
     if (topKeywords.some(keyword => styleIdLower.includes(keyword))) {
-      return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // nose, eyes, ears, shoulders, elbows, wrists
+      return [5, 6, 7, 8, 9, 10, 11, 12] // shoulders, elbows, wrists, hips (waist area)
     }
     
     // Check if it's a bottom item

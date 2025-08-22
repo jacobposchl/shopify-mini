@@ -106,24 +106,26 @@ const OUTLINE_CONFIGS: Record<string, OutlineConfig> = {
 }
 
 // Style-specific outline drawing functions
-const drawUpperBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+const drawUpperBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.8) => {
   ctx.save()
   ctx.globalAlpha = alpha
   ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = 2
+  ctx.lineWidth = 4
   
   const headRadius = 25 * scale
   const shoulderWidth = 120 * scale
   const chestHeight = 80 * scale
   const armLength = 100 * scale
   
-  // Head
+  // Head - use a box instead of circle with lines
+  const headBoxWidth = headRadius * 1.5
+  const headBoxHeight = headRadius * 2
   ctx.beginPath()
-  ctx.arc(centerX, centerY, headRadius, 0, 2 * Math.PI)
+  ctx.rect(centerX - headBoxWidth/2, centerY - headBoxHeight/2, headBoxWidth, headBoxHeight)
   ctx.stroke()
   
   // Shoulders
-  const shoulderY = centerY + headRadius + 10
+  const shoulderY = centerY + headBoxHeight/2 + 15
   ctx.beginPath()
   ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
   ctx.lineTo(centerX + shoulderWidth/2, shoulderY)
@@ -150,11 +152,11 @@ const drawUpperBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, ce
   ctx.restore()
 }
 
-const drawLowerBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+const drawLowerBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.8) => {
   ctx.save()
   ctx.globalAlpha = alpha
   ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = 2
+  ctx.lineWidth = 4
   
   const hipWidth = 100 * scale
   const legLength = 160 * scale
@@ -178,17 +180,17 @@ const drawLowerBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, ce
   ctx.restore()
 }
 
-const drawFullBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+const drawFullBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.8) => {
   // Draw both upper and lower body
   drawUpperBodyOutline(ctx, centerX, centerY, scale, alpha)
-  drawLowerBodyOutline(ctx, centerX, centerY + 120 * scale, scale, alpha)
+  drawLowerBodyOutline(ctx, centerX, centerY + 80 * scale, scale, alpha)
 }
 
-const drawUpperExtendedOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+const drawUpperExtendedOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.8) => {
   ctx.save()
   ctx.globalAlpha = alpha
   ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = 2
+  ctx.lineWidth = 4
   
   const headRadius = 25 * scale
   const shoulderWidth = 120 * scale
@@ -196,13 +198,15 @@ const drawUpperExtendedOutline = (ctx: CanvasRenderingContext2D, centerX: number
   const armLength = 100 * scale
   const torsoHeight = 60 * scale
   
-  // Head
+  // Head - use a box instead of circle with lines
+  const headBoxWidth = headRadius * 1.5
+  const headBoxHeight = headRadius * 2
   ctx.beginPath()
-  ctx.arc(centerX, centerY, headRadius, 0, 2 * Math.PI)
+  ctx.rect(centerX - headBoxWidth/2, centerY - headBoxHeight/2, headBoxWidth, headBoxHeight)
   ctx.stroke()
   
   // Shoulders
-  const shoulderY = centerY + headRadius + 10
+  const shoulderY = centerY + headBoxHeight/2 + 15
   ctx.beginPath()
   ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
   ctx.lineTo(centerX + shoulderWidth/2, shoulderY)
@@ -977,13 +981,13 @@ export function MeasurementsStepImpl({
       const centerX = canvas.width / 2
       let centerY: number
       
-      if (isTopItem) {
-        // Top items: center of screen
-        centerY = canvas.height * 0.5
-      } else {
-        // Bottom items: align to bottom of screen
-        centerY = canvas.height * 0.8
-      }
+             if (isTopItem) {
+         // Top items: position higher up from center for better visibility
+         centerY = canvas.height * 0.4
+       } else {
+         // Bottom items: position higher up from bottom edge for better visibility
+         centerY = canvas.height * 0.65
+       }
       
       // Scale image to fit nicely on screen (adjust these values as needed)
       const targetWidth = 200
@@ -993,9 +997,9 @@ export function MeasurementsStepImpl({
       const x = centerX - targetWidth / 2
       const y = centerY - targetHeight / 2
       
-      // Set transparency
+      // Set transparency - make outlines more visible
       ctx.save()
-      ctx.globalAlpha = 0.6
+      ctx.globalAlpha = 0.85
       
       // Draw the image
       ctx.drawImage(img, x, y, targetWidth, targetHeight)
@@ -1007,25 +1011,27 @@ export function MeasurementsStepImpl({
 
 
     // Define outline drawing functions locally for this canvas context
-    const drawUpperBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+    const drawUpperBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.8) => {
       console.log('Drawing upper body outline at:', centerX, centerY, 'scale:', scale, 'alpha:', alpha)
       ctx.save()
       ctx.globalAlpha = alpha
       ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 3
+      ctx.lineWidth = 4
       
       const headRadius = 25 * scale
       const shoulderWidth = 120 * scale
       const chestHeight = 80 * scale
       const armLength = 100 * scale
       
-      // Head
+      // Head - use a box instead of circle with lines
+      const headBoxWidth = headRadius * 1.5
+      const headBoxHeight = headRadius * 2
       ctx.beginPath()
-      ctx.arc(centerX, centerY, headRadius, 0, 2 * Math.PI)
+      ctx.rect(centerX - headBoxWidth/2, centerY - headBoxHeight/2, headBoxWidth, headBoxHeight)
       ctx.stroke()
       
       // Shoulders
-      const shoulderY = centerY + headRadius + 10
+      const shoulderY = centerY + headBoxHeight/2 + 15
       ctx.beginPath()
       ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
       ctx.lineTo(centerX + shoulderWidth/2, shoulderY)
@@ -1053,11 +1059,11 @@ export function MeasurementsStepImpl({
       ctx.restore()
     }
 
-    const drawLowerBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+    const drawLowerBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.8) => {
       ctx.save()
       ctx.globalAlpha = alpha
       ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 3
+      ctx.lineWidth = 4
       
       const hipWidth = 100 * scale
       const legLength = 160 * scale
@@ -1081,17 +1087,17 @@ export function MeasurementsStepImpl({
       ctx.restore()
     }
 
-    const drawFullBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+    const drawFullBodyOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.8) => {
       // Draw both upper and lower body
       drawUpperBodyOutline(ctx, centerX, centerY, scale, alpha)
-      drawLowerBodyOutline(ctx, centerX, centerY + 120 * scale, scale, alpha)
+      drawLowerBodyOutline(ctx, centerX, centerY + 80 * scale, scale, alpha)
     }
 
-    const drawUpperExtendedOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.3) => {
+    const drawUpperExtendedOutline = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, scale: number = 1, alpha: number = 0.8) => {
       ctx.save()
       ctx.globalAlpha = alpha
       ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 3
+      ctx.lineWidth = 4
       
       const headRadius = 25 * scale
       const shoulderWidth = 120 * scale
@@ -1099,13 +1105,15 @@ export function MeasurementsStepImpl({
       const armLength = 100 * scale
       const torsoHeight = 60 * scale
       
-      // Head
+      // Head - use a box instead of circle with lines
+      const headBoxWidth = headRadius * 1.5
+      const headBoxHeight = headRadius * 2
       ctx.beginPath()
-      ctx.arc(centerX, centerY, headRadius, 0, 2 * Math.PI)
+      ctx.rect(centerX - headBoxWidth/2, centerY - headBoxHeight/2, headBoxWidth, headBoxHeight)
       ctx.stroke()
       
       // Shoulders
-      const shoulderY = centerY + headRadius + 10
+      const shoulderY = centerY + headBoxHeight/2 + 15
       ctx.beginPath()
       ctx.moveTo(centerX - shoulderWidth/2, shoulderY)
       ctx.lineTo(centerX + shoulderWidth/2, shoulderY)
@@ -1149,91 +1157,187 @@ export function MeasurementsStepImpl({
     // Determine which joints to highlight based on clothing type
     const isTopItem = getOutlineForClothingType(selectedItemName || '') === '/upper-body-outline.png'
     
-    // Define relevant joints for top vs bottom items
-    const topItemJoints = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // nose, eyes, ears, shoulders, elbows, wrists
-    const bottomItemJoints = [0, 11, 12, 13, 14, 15, 16] // nose, hips, knees, ankles
+         // Define relevant joints for top vs bottom items - exclude head features, only show body joints
+     const topItemJoints = [5, 6, 7, 8, 9, 10, 11, 12] // shoulders, elbows, wrists, hips (waist area)
+     const bottomItemJoints = [11, 12, 13, 14, 15, 16] // hips, knees, ankles
     
+    // Use the same logic as the pose detection hook for consistency
     const relevantJoints = isTopItem ? topItemJoints : bottomItemJoints
     
+         // Draw dynamic head box that follows the detected nose position with 3D rotation
+     if (isTopItem && poseResults.landmarks[0] && poseResults.landmarks[0].confidence > 0.3) {
+       // Get nose position and convert to canvas coordinates
+       const noseX = canvas.width - (poseResults.landmarks[0].x * scale + offsetX)
+       const noseY = poseResults.landmarks[0].y * scale + offsetY
+       
+       // Calculate 3D rotation based on ear positions (indices 3 and 4) for head tilt
+       let tiltAngle = 0
+       if (poseResults.landmarks[3] && poseResults.landmarks[4] && 
+           poseResults.landmarks[3].confidence > 0.3 && poseResults.landmarks[4].confidence > 0.3) {
+         const leftEarX = poseResults.landmarks[3].x * scale + offsetX
+         const leftEarY = poseResults.landmarks[3].y * scale + offsetY
+         const rightEarX = poseResults.landmarks[4].x * scale + offsetX
+         const rightEarY = poseResults.landmarks[4].y * scale + offsetY
+         
+         // Calculate head tilt (roll) - corrected direction
+         tiltAngle = Math.atan2(leftEarY - rightEarY, rightEarX - leftEarX)
+       }
+       
+               // Calculate dynamic head box size based on shoulder distance (indices 5 and 6)
+        let headBoxWidth = 60 // Default size - reduced from 120
+        let headBoxHeight = 80 // Default size - reduced from 160
+        
+        if (poseResults.landmarks[5] && poseResults.landmarks[6] && 
+            poseResults.landmarks[5].confidence > 0.3 && poseResults.landmarks[6].confidence > 0.3) {
+          // Get shoulder positions
+          const leftShoulderX = poseResults.landmarks[5].x * scale + offsetX
+          const rightShoulderX = poseResults.landmarks[6].x * scale + offsetX
+          
+          // Calculate shoulder width in canvas coordinates
+          const shoulderWidth = Math.abs(rightShoulderX - leftShoulderX)
+          
+          // Scale head box proportionally to shoulder width
+          // Base the head box size on shoulder width with appropriate proportions
+          const baseShoulderWidth = 120 // Base shoulder width for scaling
+          const scaleFactor = shoulderWidth / baseShoulderWidth
+          
+          headBoxWidth = headBoxWidth * scaleFactor // Reduced from 120
+          headBoxHeight = headBoxHeight * scaleFactor // Reduced from 160
+          
+          // Ensure minimum and maximum sizes - adjusted for smaller base size
+          headBoxWidth = Math.max(40, Math.min(140, headBoxWidth)) // Reduced from 60-200
+          headBoxHeight = Math.max(50, Math.min(175, headBoxHeight)) // Reduced from 80-267
+        }
+       
+       ctx.save()
+       ctx.strokeStyle = '#00ff00' // Green color
+       ctx.lineWidth = 6 // Doubled from 3 to make edges twice as thick
+       ctx.globalAlpha = 0.8
+       
+       // Move to nose position and apply 3D rotation (tilt)
+       ctx.translate(noseX, noseY)
+       ctx.rotate(tiltAngle)
+       
+       // Draw only the corners of the box
+       const halfWidth = headBoxWidth / 2
+       const halfHeight = headBoxHeight / 2
+       
+       // Top-left corner
+       ctx.beginPath()
+       ctx.moveTo(-halfWidth, -halfHeight)
+       ctx.lineTo(-halfWidth + 15, -halfHeight)
+       ctx.moveTo(-halfWidth, -halfHeight)
+       ctx.lineTo(-halfWidth, -halfHeight + 15)
+       ctx.stroke()
+       
+       // Top-right corner
+       ctx.beginPath()
+       ctx.moveTo(halfWidth, -halfHeight)
+       ctx.lineTo(halfWidth - 15, -halfHeight)
+       ctx.moveTo(halfWidth, -halfHeight)
+       ctx.lineTo(halfWidth, -halfHeight + 15)
+       ctx.stroke()
+       
+       // Bottom-left corner
+       ctx.beginPath()
+       ctx.moveTo(-halfWidth, halfHeight)
+       ctx.lineTo(-halfWidth + 15, halfHeight)
+       ctx.moveTo(-halfWidth, halfHeight)
+       ctx.lineTo(-halfWidth, halfHeight - 15)
+       ctx.stroke()
+       
+       // Bottom-right corner
+       ctx.beginPath()
+       ctx.moveTo(halfWidth, halfHeight)
+       ctx.lineTo(halfWidth - 15, halfHeight)
+       ctx.moveTo(halfWidth, halfHeight)
+       ctx.lineTo(halfWidth, halfHeight - 15)
+       ctx.stroke()
+       
+       ctx.restore()
+     }
+    
+    // Only draw prioritized landmarks based on clothing type - hide non-relevant joints
     poseResults.landmarks.forEach((landmark: any, index: number) => {
-      if (landmark.confidence > 0.3) {
+      if (landmark.confidence > 0.3 && relevantJoints.includes(index)) {
         const x = canvas.width - (landmark.x * scale + offsetX)
         const y = landmark.y * scale + offsetY
 
-        const isRelevant = relevantJoints.includes(index)
-
-        ctx.fillStyle = isRelevant ? '#00ff00' : '#666666'
-        ctx.beginPath()
-        ctx.arc(x, y, isRelevant ? 8 : 4, 0, 2 * Math.PI)
-        ctx.fill()
-
         ctx.fillStyle = '#00ff00'
+        ctx.beginPath()
+        ctx.arc(x, y, 8, 0, 2 * Math.PI)
+        ctx.fill()
       }
     })
 
     const skeletonConnections = [
-      [0, 5],
-      [0, 6],
-      [1, 3],
-      [2, 4],
-      [3, 5],
-      [4, 6],
-      [5, 6],
-      [5, 7],
-      [6, 8],
-      [7, 9],
-      [8, 10],
-      [5, 11],
-      [6, 12],
-      [11, 12],
-      [11, 13],
-      [12, 14],
-      [13, 15],
-      [14, 16],
-      [13, 14],
+      // COMMENTED OUT: All head-related connections to avoid lines to head
+      // [0, 5], // nose to left shoulder
+      // [0, 6], // nose to right shoulder
+      // [1, 3], // left eye to left ear
+      // [2, 4], // right eye to right ear
+      // [3, 5], // left ear to left shoulder
+      // [4, 6], // right ear to right shoulder
+      [5, 6], // left shoulder to right shoulder
+      [5, 7], // left shoulder to left elbow
+      [6, 8], // right shoulder to right elbow
+      [7, 9], // left elbow to left wrist
+      [8, 10], // right elbow to right wrist
+      [5, 11], // left shoulder to left hip
+      [6, 12], // right shoulder to right hip
+      [11, 12], // left hip to right hip
+      [11, 13], // left hip to left knee
+      [12, 14], // right hip to right knee
+      [13, 15], // left knee to left ankle
+      [14, 16], // right knee to right ankle
+      [13, 14], // left knee to right knee
     ]
 
+    // Only draw prioritized skeleton connections based on clothing type - hide non-relevant connections
     skeletonConnections.forEach(([index1, index2]) => {
       const landmark1 = poseResults.landmarks[index1]
       const landmark2 = poseResults.landmarks[index2]
 
-      if (landmark1 && landmark2 && landmark1.confidence > 0.3 && landmark2.confidence > 0.3) {
+      // Only draw connections where both landmarks are prioritized for the clothing type
+      if (landmark1 && landmark2 && 
+          landmark1.confidence > 0.3 && landmark2.confidence > 0.3 &&
+          relevantJoints.includes(index1) && relevantJoints.includes(index2)) {
+        
         const x1 = canvas.width - (landmark1.x * scale + offsetX)
         const y1 = landmark1.y * scale + offsetY
         const x2 = canvas.width - (landmark2.x * scale + offsetX)
         const y2 = landmark2.y * scale + offsetY
 
-        const isRelevant =
-          relevantJoints.includes(index1) && relevantJoints.includes(index2)
-
-        ctx.strokeStyle = isRelevant ? '#00ff00' : '#666666'
-        ctx.lineWidth = isRelevant ? 3 : 1
+        ctx.strokeStyle = '#00ff00'
+        ctx.lineWidth = 3
         ctx.beginPath()
         ctx.moveTo(x1, y1)
         ctx.lineTo(x2, y2)
         ctx.stroke()
 
-        if (isRelevant) {
-          const distance = calculateDistance(landmark1, landmark2, scale)
-          const midX = (x1 + x2) / 2
-          const midY = (y1 + y2) / 2
-          const lineLength = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-          const offsetDist = 25
-          const offX = (-(y2 - y1) / lineLength) * offsetDist
-          const offY = ((x2 - x1) / lineLength) * offsetDist
-          const textX = midX + offX
-          const textY = midY + offY
+                 // Draw distance measurements for relevant connections
+         // COMMENTED OUT: Number texts for now
+         /*
+         const distance = calculateDistance(landmark1, landmark2, scale)
+         const midX = (x1 + x2) / 2
+         const midY = (y1 + y2) / 2
+         const lineLength = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+         const offsetDist = 25
+         const offX = (-(y2 - y1) / lineLength) * offsetDist
+         const offY = ((x2 - x1) / lineLength) * offsetDist
+         const textX = midX + offX
+         const textY = midY + offY
 
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
-          ctx.font = 'bold 12px Arial'
-          const text = `${distance}"`
-          const textWidth = ctx.measureText(text).width
-          ctx.fillRect(textX - textWidth / 2 - 3, textY - 8, textWidth + 6, 16)
+         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+         ctx.font = 'bold 12px Arial'
+         const text = `${distance}"`
+         const textWidth = ctx.measureText(text).width
+         ctx.fillRect(textX - textWidth / 2 - 3, textY - 8, textWidth + 6, 16)
 
-          ctx.fillStyle = '#00ff00'
-          ctx.textAlign = 'center'
-          ctx.fillText(text, textX, textY + 3)
-        }
+         ctx.fillStyle = '#00ff00'
+         ctx.textAlign = 'center'
+         ctx.fillText(text, textX, textY + 3)
+         */
       }
     })
 
@@ -1254,12 +1358,13 @@ export function MeasurementsStepImpl({
               value: `${measurements.shoulders}"`,
               description: 'Distance between shoulder points',
             })
-            connections.push({
-              indices: [0, 11],
-              label: 'Body Length',
-              value: `${measurements.chest}"`,
-              description: 'Upper body length',
-            })
+            // COMMENTED OUT: Head-to-hip connection to avoid lines to head
+            // connections.push({
+            //   indices: [0, 11],
+            //   label: 'Body Length',
+            //   value: `${measurements.chest}"`,
+            //   description: 'Upper body length',
+            // })
             connections.push({
               indices: [5, 7],
               label: 'Arm Length',
@@ -1311,12 +1416,13 @@ export function MeasurementsStepImpl({
               value: `${measurements.shoulders}"`,
               description: 'Distance between shoulder points',
             })
-            connections.push({
-              indices: [0, 11],
-              label: 'Body Length',
-              value: `${measurements.chest}"`,
-              description: 'Upper body length',
-            })
+            // COMMENTED OUT: Head-to-hip connection to avoid lines to head
+            // connections.push({
+            //   indices: [0, 11],
+            //   label: 'Body Length',
+            //   value: `${measurements.chest}"`,
+            //   description: 'Upper body length',
+            // })
             connections.push({
               indices: [5, 7],
               label: 'Arm Length',
