@@ -292,6 +292,11 @@ const analyzeUserPosition = (
   let idealWidth = 0
   let minWidth = 0
   let maxWidth = 0
+  let scaleAnalysis = {
+    isGoodScale: false,
+    scaleFactor: 1.0,
+    feedback: ''
+  }
 
   if (config.focusArea.includes('upper')) {
     // Use shoulder width for upper body measurements
@@ -300,6 +305,30 @@ const analyzeUserPosition = (
       idealWidth = config.idealShoulderWidth
       minWidth = config.minShoulderWidth
       maxWidth = config.maxShoulderWidth
+      
+      // Enhanced scale analysis for upper body
+      if (landmarks[11] && landmarks[12]) {
+        const hipWidth = Math.abs(landmarks[11].x - landmarks[12].x) * canvasWidth
+        const shoulderToHipRatio = currentWidth / hipWidth
+        const expectedRatio = 1.07 // Shoulders slightly wider than hips
+        
+        // Calculate scale factor based on shoulder width
+        scaleAnalysis.scaleFactor = currentWidth / idealWidth
+        
+        // Check if proportions are reasonable
+        const ratioDeviation = Math.abs(shoulderToHipRatio - expectedRatio)
+        scaleAnalysis.isGoodScale = ratioDeviation < 0.2 && scaleAnalysis.scaleFactor > 0.6 && scaleAnalysis.scaleFactor < 1.8
+        
+        if (scaleAnalysis.scaleFactor < 0.6) {
+          scaleAnalysis.feedback = 'Too far from camera'
+        } else if (scaleAnalysis.scaleFactor > 1.8) {
+          scaleAnalysis.feedback = 'Too close to camera'
+        } else if (ratioDeviation > 0.2) {
+          scaleAnalysis.feedback = 'Please face camera directly'
+        } else {
+          scaleAnalysis.feedback = 'Good scale'
+        }
+      }
     }
   } else {
     // Use hip width for lower body measurements  
@@ -308,27 +337,146 @@ const analyzeUserPosition = (
       idealWidth = config.idealHipWidth
       minWidth = config.minHipWidth
       maxWidth = config.maxHipWidth
+      
+      // Enhanced scale analysis for lower body
+      if (landmarks[13] && landmarks[14]) {
+        const kneeWidth = Math.abs(landmarks[13].x - landmarks[14].x) * canvasWidth
+        const hipToKneeRatio = currentWidth / kneeWidth
+        const expectedRatio = 1.2 // Hips wider than knees
+        
+        // Calculate scale factor based on hip width
+        scaleAnalysis.scaleFactor = currentWidth / idealWidth
+        
+        // Check if proportions are reasonable
+        const ratioDeviation = Math.abs(hipToKneeRatio - expectedRatio)
+        scaleAnalysis.isGoodScale = ratioDeviation < 0.3 && scaleAnalysis.scaleFactor > 0.6 && scaleAnalysis.scaleFactor < 1.8
+        
+        if (scaleAnalysis.scaleFactor < 0.6) {
+          scaleAnalysis.feedback = 'Too far from camera'
+        } else if (scaleAnalysis.scaleFactor > 1.8) {
+          scaleAnalysis.feedback = 'Too close to camera'
+        } else if (ratioDeviation > 0.3) {
+          scaleAnalysis.feedback = 'Please face camera directly'
+        } else {
+          scaleAnalysis.feedback = 'Good scale'
+        }
+      }
     }
   }
 
-  // Distance analysis
-  const isCorrectDistance = currentWidth >= minWidth && currentWidth <= maxWidth
-  const isTooClose = currentWidth > maxWidth
-  const isTooFar = currentWidth < minWidth
+  // Distance analysis - now considers both width and scale
+  const isCorrectDistance = currentWidth >= minWidth && currentWidth <= maxWidth && scaleAnalysis.isGoodScale
+  const isTooClose = currentWidth > maxWidth || scaleAnalysis.scaleFactor > 1.8
+  const isTooFar = currentWidth < minWidth || scaleAnalysis.scaleFactor < 0.6
 
-  // Alignment analysis (check if person is centered)
-  const bodyCenter = landmarks[0] ? landmarks[0].x : 0.5 // Use nose as center reference
-  const isProperlyAligned = Math.abs(bodyCenter - 0.5) < 0.15 // Within 15% of center
+  // IMPROVED: Calculate person's actual body center based on clothing type
+  let bodyCenterX = 0.5 // Default to center
+  let bodyCenterY = 0.5
+  
+  if (config.focusArea.includes('upper')) {
+    // For upper body items, use the midpoint between shoulders and hips
+    if (landmarks[5] && landmarks[6] && landmarks[11] && landmarks[12]) {
+      const shoulderMidX = (landmarks[5].x + landmarks[6].x) / 2
+      const hipMidX = (landmarks[11].x + landmarks[12].x) / 2
+      bodyCenterX = (shoulderMidX + hipMidX) / 2
+      bodyCenterY = (landmarks[5].y + landmarks[11].y) / 2
+    } else if (landmarks[5] && landmarks[6]) {
+      // Fallback to just shoulders
+      bodyCenterX = (landmarks[5].x + landmarks[6].x) / 2
+      bodyCenterY = landmarks[5].y
+    }
+  } else {
+    // For lower body items, use the midpoint between hips
+    if (landmarks[11] && landmarks[12]) {
+      bodyCenterX = (landmarks[11].x + landmarks[12].x) / 2
+      bodyCenterY = landmarks[11].y
+    }
+  }
 
-  // Generate feedback
+  // Calculate screen center in pixels
+  const screenCenterX = canvasWidth / 2
+  const screenCenterY = canvasHeight / 2
+  
+  // Calculate deviation in pixels using the SAME method as the canvas display
+  // This matches exactly what's shown above the body center
+  // The canvas uses: canvas.width - (bodyCenterX * scale + offsetX) to account for horizontal flip
+  // We need to match this coordinate transformation
+  const bodyCenterCanvasX = canvasWidth - (bodyCenterX * canvasWidth)
+  const centerDeviationXPixels = Math.abs(bodyCenterCanvasX - screenCenterX)
+  const centerDeviationYPixels = Math.abs((bodyCenterY * canvasHeight) - screenCenterY)
+  
+  // Convert to percentage of screen dimensions for tolerance checking
+  const centerDeviationX = centerDeviationXPixels / canvasWidth
+  const centerDeviationY = centerDeviationYPixels / canvasHeight
+  
+  // More lenient horizontal centering (20% of screen width) and vertical centering (25% of screen height)
+  const horizontalTolerance = 0.20
+  const verticalTolerance = 0.25
+  
+  // Add tighter tolerance for "almost there" feedback
+  const tightHorizontalTolerance = 0.10
+  const tightVerticalTolerance = 0.15
+  
+  const isHorizontallyCentered = centerDeviationX < horizontalTolerance
+  const isVerticallyCentered = centerDeviationY < verticalTolerance
+  const isProperlyAligned = isHorizontallyCentered && isVerticallyCentered
+  
+  // Check if user is getting close to target
+  const isAlmostHorizontallyCentered = centerDeviationX < tightHorizontalTolerance
+  const isAlmostVerticallyCentered = centerDeviationY < tightVerticalTolerance
+
+  // Generate more specific feedback based on actual pixel deviation
   let feedbackMessage = ""
   let feedbackType: 'success' | 'warning' | 'error' = 'success'
   let adjustmentNeeded: PositionFeedback['adjustmentNeeded'] = 'good'
 
   if (!isProperlyAligned) {
-    feedbackMessage = "Please center yourself in the frame"
+    // Check if user is getting close to target for encouraging feedback
+    if (isAlmostHorizontallyCentered && isAlmostVerticallyCentered) {
+      feedbackMessage = "Almost there! Make small adjustments to center perfectly"
+      feedbackType = 'warning'
+      adjustmentNeeded = 'center_yourself'
+    } else {
+      // Provide specific directional feedback based on actual pixel deviation
+      if (!isHorizontallyCentered && !isVerticallyCentered) {
+        // Both horizontal and vertical adjustments needed
+        if (bodyCenterX < 0.5) {
+          feedbackMessage = "Move right and step back from camera"
+        } else {
+          feedbackMessage = "Move left and step back from camera"
+        }
+        if (bodyCenterY < 0.5) {
+          feedbackMessage = feedbackMessage.replace("step back", "move closer")
+        }
+      } else if (!isHorizontallyCentered) {
+        // Only horizontal adjustment needed
+        if (bodyCenterX < 0.5) {
+          feedbackMessage = "Move right to center"
+        } else {
+          feedbackMessage = "Move left to center"
+        }
+      } else {
+        // Only vertical adjustment needed
+        if (bodyCenterY < 0.5) {
+          feedbackMessage = "Step back from camera"
+        } else {
+          feedbackMessage = "Move closer to camera"
+        }
+      }
+      feedbackType = 'warning'
+      adjustmentNeeded = 'center_yourself'
+    }
+  } else if (!scaleAnalysis.isGoodScale) {
+    // Use the scale analysis feedback
+    feedbackMessage = scaleAnalysis.feedback
     feedbackType = 'warning'
-    adjustmentNeeded = 'center_yourself'
+    if (scaleAnalysis.scaleFactor > 1.8) {
+      adjustmentNeeded = 'move_back'
+    } else if (scaleAnalysis.scaleFactor < 0.6) {
+      adjustmentNeeded = 'move_closer'
+    } else {
+      adjustmentNeeded = 'center_yourself'
+    }
   } else if (isTooClose) {
     feedbackMessage = "Please step back from the camera"
     feedbackType = 'warning'  
@@ -338,9 +486,16 @@ const analyzeUserPosition = (
     feedbackType = 'warning'
     adjustmentNeeded = 'move_closer'
   } else {
-    feedbackMessage = "Perfect position! Hold still."
-    feedbackType = 'success'
-    adjustmentNeeded = 'good'
+    // Check if user is very close but not quite perfect
+    if (centerDeviationXPixels < 20 && centerDeviationYPixels < 20) {
+      feedbackMessage = "Great! Just a tiny adjustment needed"
+      feedbackType = 'warning'
+      adjustmentNeeded = 'center_yourself'
+    } else {
+      feedbackMessage = "Perfect position! Hold still."
+      feedbackType = 'success'
+      adjustmentNeeded = 'good'
+    }
   }
 
   return {
@@ -1148,6 +1303,179 @@ export function MeasurementsStepImpl({
 
          // Draw style-specific outline first (behind everything)
      drawStyleSpecificOutline()
+
+    // Draw positioning guides and tolerance zones
+    const drawPositioningGuides = () => {
+      if (!poseResults?.isDetected || !selectedStyleId) return
+      
+      const config = OUTLINE_CONFIGS[selectedStyleId as keyof typeof OUTLINE_CONFIGS] || OUTLINE_CONFIGS.shirts
+      const landmarks = poseResults.landmarks
+      
+      // Calculate body center
+      let bodyCenterX = 0.5
+      let bodyCenterY = 0.5
+      
+      if (config.focusArea.includes('upper')) {
+        if (landmarks[5] && landmarks[6] && landmarks[11] && landmarks[12]) {
+          const shoulderMidX = (landmarks[5].x + landmarks[6].x) / 2
+          const hipMidX = (landmarks[11].x + landmarks[12].x) / 2
+          bodyCenterX = (shoulderMidX + hipMidX) / 2
+          bodyCenterY = (landmarks[5].y + landmarks[11].y) / 2
+        } else if (landmarks[5] && landmarks[6]) {
+          bodyCenterX = (landmarks[5].x + landmarks[6].x) / 2
+          bodyCenterY = landmarks[5].y
+        }
+      } else {
+        if (landmarks[11] && landmarks[12]) {
+          bodyCenterX = (landmarks[11].x + landmarks[12].x) / 2
+          bodyCenterY = landmarks[11].y
+        }
+      }
+      
+      // Convert normalized coordinates to canvas coordinates
+      const bodyCenterCanvasX = canvas.width - (bodyCenterX * scale + offsetX)
+      const bodyCenterCanvasY = bodyCenterY * scale + offsetY
+      
+      // Calculate deviation in pixels for display
+      const screenCenterX = canvas.width / 2
+      const screenCenterY = canvas.height / 2
+      const centerDeviationXPixels = Math.abs(bodyCenterCanvasX - screenCenterX)
+      const centerDeviationYPixels = Math.abs(bodyCenterCanvasY - screenCenterY)
+      
+      // Draw body center indicator
+      ctx.save()
+      ctx.strokeStyle = '#ff6b6b'
+      ctx.lineWidth = 3
+      ctx.globalAlpha = 0.8
+      
+      // Draw crosshair at body center
+      const crosshairSize = 20
+      ctx.beginPath()
+      ctx.moveTo(bodyCenterCanvasX - crosshairSize, bodyCenterCanvasY)
+      ctx.lineTo(bodyCenterCanvasX + crosshairSize, bodyCenterCanvasY)
+      ctx.moveTo(bodyCenterCanvasX, bodyCenterCanvasY - crosshairSize)
+      ctx.lineTo(bodyCenterCanvasX, bodyCenterCanvasY + crosshairSize)
+      ctx.stroke()
+      
+      // Draw circle around body center
+      ctx.beginPath()
+      ctx.arc(bodyCenterCanvasX, bodyCenterCanvasY, 8, 0, 2 * Math.PI)
+      ctx.stroke()
+      
+      ctx.restore()
+      
+      // Draw deviation text above body center
+      ctx.save()
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'bold 14px Arial'
+      ctx.textAlign = 'center'
+      ctx.globalAlpha = 0.9
+      
+      const deviationText = `${centerDeviationXPixels.toFixed(0)}px`
+      const textX = bodyCenterCanvasX
+      const textY = bodyCenterCanvasY - 25
+      
+      // Draw text background
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
+      const textWidth = ctx.measureText(deviationText).width
+      ctx.fillRect(textX - textWidth/2 - 4, textY - 10, textWidth + 8, 20)
+      
+      // Draw text
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(deviationText, textX, textY)
+      
+      ctx.restore()
+      
+      // Draw tolerance zones
+      const horizontalTolerance = 0.20
+      const verticalTolerance = 0.25
+      
+      // Calculate tolerance zones in actual canvas pixels
+      const toleranceLeft = screenCenterX - (horizontalTolerance * canvas.width)
+      const toleranceRight = screenCenterX + (horizontalTolerance * canvas.width)
+      const toleranceTop = screenCenterY - (verticalTolerance * canvas.height)
+      const toleranceBottom = screenCenterY + (verticalTolerance * canvas.height)
+      
+      ctx.save()
+      ctx.strokeStyle = '#4ecdc4'
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.3
+      ctx.setLineDash([5, 5])
+      
+      // Draw tolerance rectangle
+      ctx.beginPath()
+      ctx.rect(toleranceLeft, toleranceTop, toleranceRight - toleranceLeft, toleranceBottom - toleranceTop)
+      ctx.stroke()
+      
+      ctx.restore()
+      
+      // Draw tolerance zone labels
+      ctx.save()
+      ctx.fillStyle = '#4ecdc4'
+      ctx.font = '10px Arial'
+      ctx.textAlign = 'center'
+      ctx.globalAlpha = 0.7
+      
+      // Left boundary label
+      ctx.fillText('L', toleranceLeft, screenCenterY + 20)
+      // Right boundary label  
+      ctx.fillText('R', toleranceRight, screenCenterY + 20)
+      // Top boundary label
+      ctx.fillText('T', screenCenterX, toleranceTop - 5)
+      // Bottom boundary label
+      ctx.fillText('B', screenCenterX, toleranceBottom + 15)
+      
+      ctx.restore()
+      
+      // Draw screen center indicator
+      // const screenCenterX = canvas.width / 2  // Already calculated above
+      // const screenCenterY = canvas.height / 2 // Already calculated above
+      
+      ctx.save()
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.5
+      ctx.setLineDash([3, 3])
+      
+      // Draw vertical center line
+      ctx.beginPath()
+      ctx.moveTo(screenCenterX, 0)
+      ctx.lineTo(screenCenterX, canvas.height)
+      ctx.stroke()
+      
+      // Draw horizontal center line
+      ctx.beginPath()
+      ctx.moveTo(0, screenCenterY)
+      ctx.lineTo(canvas.width, screenCenterY)
+      ctx.stroke()
+      
+      ctx.restore()
+      
+      // Draw screen center point indicator
+      ctx.save()
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 3
+      ctx.globalAlpha = 0.8
+      
+      // Draw crosshair at screen center
+      const screenCrosshairSize = 15
+      ctx.beginPath()
+      ctx.moveTo(screenCenterX - screenCrosshairSize, screenCenterY)
+      ctx.lineTo(screenCenterX + screenCrosshairSize, screenCenterY)
+      ctx.moveTo(screenCenterX, screenCenterY - screenCrosshairSize)
+      ctx.lineTo(screenCenterX, screenCenterY + screenCrosshairSize)
+      ctx.stroke()
+      
+      // Draw circle around screen center
+      ctx.beginPath()
+      ctx.arc(screenCenterX, screenCenterY, 6, 0, 2 * Math.PI)
+      ctx.stroke()
+      
+      ctx.restore()
+    }
+    
+    // Draw positioning guides
+    drawPositioningGuides()
 
     // Then draw pose landmarks and skeleton on top
     ctx.strokeStyle = '#00ff00'
