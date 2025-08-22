@@ -28,7 +28,8 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     userPreferences,
     fetchMoreRecommended,
     recommendedLoading,
-    hasMoreRecommended
+    hasMoreRecommended,
+    allShopsBeforeFilter
   } = useShopDiscovery()
 
   // Error boundary - if anything crashes, show fallback
