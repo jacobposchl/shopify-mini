@@ -408,17 +408,26 @@ const analyzeUserPosition = (
   const centerDistanceXPixels = bodyCenterCanvasX - screenCenterX
   const centerDistanceYPixels = (bodyCenterY * scale + offsetY) - screenCenterY
   
+  // Debug the coordinate transformation and directional logic
+  console.log('Debug position:', {
+    bodyCenterX: bodyCenterX,
+    bodyCenterCanvasX: bodyCenterCanvasX,
+    screenCenterX: screenCenterX,
+    centerDistanceXPixels: centerDistanceXPixels,
+    shouldMoveRight: centerDistanceXPixels < 0
+  });
+  
   // Convert to percentage of screen dimensions for tolerance checking
   const centerDeviationX = Math.abs(centerDistanceXPixels) / canvasWidth
   const centerDeviationY = Math.abs(centerDistanceYPixels) / canvasHeight
   
-  // Reduced horizontal centering (15% of screen width) and vertical centering (20% of screen height)
-  const horizontalTolerance = 0.15
-  const verticalTolerance = 0.20
+  // More strict horizontal centering (10% of screen width) and vertical centering (15% of screen height)
+  const horizontalTolerance = 0.10
+  const verticalTolerance = 0.15
   
   // Add tighter tolerance for "almost there" feedback
-  const tightHorizontalTolerance = 0.08
-  const tightVerticalTolerance = 0.12
+  const tightHorizontalTolerance = 0.05
+  const tightVerticalTolerance = 0.08
   
   const isHorizontallyCentered = centerDeviationX < horizontalTolerance
   const isVerticallyCentered = centerDeviationY < verticalTolerance
@@ -444,9 +453,9 @@ const analyzeUserPosition = (
                if (!isHorizontallyCentered && !isVerticallyCentered) {
           // Both horizontal and vertical adjustments needed
           if (centerDistanceXPixels < 0) {
-            feedbackMessage = "Move right and step back from camera"
+            feedbackMessage = "Move right and step back from camera"  // FLIPPED due to horizontal flip
           } else {
-            feedbackMessage = "Move left and step back from camera"
+            feedbackMessage = "Move left and step back from camera" // FLIPPED due to horizontal flip
           }
           if (centerDistanceYPixels < 0) {
             feedbackMessage = feedbackMessage.replace("step back", "move closer")
@@ -454,9 +463,9 @@ const analyzeUserPosition = (
         } else if (!isHorizontallyCentered) {
           // Only horizontal adjustment needed
           if (centerDistanceXPixels < 0) {
-            feedbackMessage = "Move right to center"
+            feedbackMessage = "Move right to center"  // FLIPPED due to horizontal flip
           } else {
-            feedbackMessage = "Move left to center"
+            feedbackMessage = "Move left to center" // FLIPPED due to horizontal flip
           }
         } else {
           // Only vertical adjustment needed
@@ -1349,53 +1358,11 @@ export function MeasurementsStepImpl({
        const centerDistanceXPixels = bodyCenterCanvasX - screenCenterX
        const centerDistanceYPixels = bodyCenterCanvasY - screenCenterY
       
-      // Draw body center indicator
-      ctx.save()
-      ctx.strokeStyle = '#ff6b6b'
-      ctx.lineWidth = 3
-      ctx.globalAlpha = 0.8
       
-      // Draw crosshair at body center
-      const crosshairSize = 20
-      ctx.beginPath()
-      ctx.moveTo(bodyCenterCanvasX - crosshairSize, bodyCenterCanvasY)
-      ctx.lineTo(bodyCenterCanvasX + crosshairSize, bodyCenterCanvasY)
-      ctx.moveTo(bodyCenterCanvasX, bodyCenterCanvasY - crosshairSize)
-      ctx.lineTo(bodyCenterCanvasX, bodyCenterCanvasY + crosshairSize)
-      ctx.stroke()
       
-      // Draw circle around body center
-      ctx.beginPath()
-      ctx.arc(bodyCenterCanvasX, bodyCenterCanvasY, 8, 0, 2 * Math.PI)
-      ctx.stroke()
-      
-      ctx.restore()
-      
-      // Draw deviation text above body center
-      ctx.save()
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 14px Arial'
-      ctx.textAlign = 'center'
-      ctx.globalAlpha = 0.9
-      
-             const deviationText = `${centerDistanceXPixels.toFixed(0)}px`
-      const textX = bodyCenterCanvasX
-      const textY = bodyCenterCanvasY - 25
-      
-      // Draw text background
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
-      const textWidth = ctx.measureText(deviationText).width
-      ctx.fillRect(textX - textWidth/2 - 4, textY - 10, textWidth + 8, 20)
-      
-      // Draw text
-      ctx.fillStyle = '#ffffff'
-      ctx.fillText(deviationText, textX, textY)
-      
-      ctx.restore()
-      
-             // Draw tolerance zones
-       const horizontalTolerance = 0.15
-       const verticalTolerance = 0.20
+                           // Draw tolerance zones
+        const horizontalTolerance = 0.10
+        const verticalTolerance = 0.15
       
       // Calculate tolerance zones in actual canvas pixels
       const toleranceLeft = screenCenterX - (horizontalTolerance * canvas.width)
@@ -2236,18 +2203,21 @@ export function MeasurementsStepImpl({
           poseStability={poseStability}
         />
 
-        {/* Position feedback */}
-        {positionFeedback && !isDemoMode && !measurements && !isProcessing && (
-          <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg font-medium text-center max-w-xs z-40 ${
-            positionFeedback.feedbackType === 'success' 
-              ? 'bg-green-500/90 text-white' 
-              : positionFeedback.feedbackType === 'warning'
-              ? 'bg-yellow-500/90 text-black'
-              : 'bg-red-500/90 text-white'
-          }`}>
-                         <div>{positionFeedback.feedbackMessage}</div>
-          </div>
-        )}
+                 {/* Position feedback */}
+         {positionFeedback && !isDemoMode && !measurements && !isProcessing && (
+           <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg font-medium text-center max-w-xs z-40 ${
+             positionFeedback.feedbackType === 'success' 
+               ? 'bg-green-500/90 text-white' 
+               : positionFeedback.feedbackType === 'warning'
+               ? 'bg-yellow-500/90 text-black'
+               : 'bg-red-500/90 text-white'
+           }`}>
+             <div>{positionFeedback.feedbackMessage}</div>
+             
+           </div>
+         )}
+         
+         
 
         {isDemoMode ? (
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
