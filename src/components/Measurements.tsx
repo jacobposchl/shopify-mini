@@ -253,7 +253,10 @@ const analyzeUserPosition = (
   poseResults: any, 
   selectedStyleId: string, 
   canvasWidth: number, 
-  canvasHeight: number
+  canvasHeight: number,
+  scale: number = 1,
+  offsetX: number = 0,
+  offsetY: number = 0
 ): PositionFeedback => {
   
   const defaultFeedback: PositionFeedback = {
@@ -397,25 +400,25 @@ const analyzeUserPosition = (
   const screenCenterX = canvasWidth / 2
   const screenCenterY = canvasHeight / 2
   
-  // Calculate deviation in pixels using the SAME method as the canvas display
+  // Calculate distance in pixels using the EXACT SAME method as the canvas display
   // This matches exactly what's shown above the body center
   // The canvas uses: canvas.width - (bodyCenterX * scale + offsetX) to account for horizontal flip
-  // We need to match this coordinate transformation
-  const bodyCenterCanvasX = canvasWidth - (bodyCenterX * canvasWidth)
-  const centerDeviationXPixels = Math.abs(bodyCenterCanvasX - screenCenterX)
-  const centerDeviationYPixels = Math.abs((bodyCenterY * canvasHeight) - screenCenterY)
+  // Now we use the same parameters for exact matching
+  const bodyCenterCanvasX = canvasWidth - (bodyCenterX * scale + offsetX)
+  const centerDistanceXPixels = bodyCenterCanvasX - screenCenterX
+  const centerDistanceYPixels = (bodyCenterY * scale + offsetY) - screenCenterY
   
   // Convert to percentage of screen dimensions for tolerance checking
-  const centerDeviationX = centerDeviationXPixels / canvasWidth
-  const centerDeviationY = centerDeviationYPixels / canvasHeight
+  const centerDeviationX = Math.abs(centerDistanceXPixels) / canvasWidth
+  const centerDeviationY = Math.abs(centerDistanceYPixels) / canvasHeight
   
-  // More lenient horizontal centering (20% of screen width) and vertical centering (25% of screen height)
-  const horizontalTolerance = 0.20
-  const verticalTolerance = 0.25
+  // Reduced horizontal centering (15% of screen width) and vertical centering (20% of screen height)
+  const horizontalTolerance = 0.15
+  const verticalTolerance = 0.20
   
   // Add tighter tolerance for "almost there" feedback
-  const tightHorizontalTolerance = 0.10
-  const tightVerticalTolerance = 0.15
+  const tightHorizontalTolerance = 0.08
+  const tightVerticalTolerance = 0.12
   
   const isHorizontallyCentered = centerDeviationX < horizontalTolerance
   const isVerticallyCentered = centerDeviationY < verticalTolerance
@@ -437,32 +440,32 @@ const analyzeUserPosition = (
       feedbackType = 'warning'
       adjustmentNeeded = 'center_yourself'
     } else {
-      // Provide specific directional feedback based on actual pixel deviation
-      if (!isHorizontallyCentered && !isVerticallyCentered) {
-        // Both horizontal and vertical adjustments needed
-        if (bodyCenterX < 0.5) {
-          feedbackMessage = "Move right and step back from camera"
+             // Provide specific directional feedback based on actual pixel deviation
+               if (!isHorizontallyCentered && !isVerticallyCentered) {
+          // Both horizontal and vertical adjustments needed
+          if (centerDistanceXPixels < 0) {
+            feedbackMessage = "Move right and step back from camera"
+          } else {
+            feedbackMessage = "Move left and step back from camera"
+          }
+          if (centerDistanceYPixels < 0) {
+            feedbackMessage = feedbackMessage.replace("step back", "move closer")
+          }
+        } else if (!isHorizontallyCentered) {
+          // Only horizontal adjustment needed
+          if (centerDistanceXPixels < 0) {
+            feedbackMessage = "Move right to center"
+          } else {
+            feedbackMessage = "Move left to center"
+          }
         } else {
-          feedbackMessage = "Move left and step back from camera"
+          // Only vertical adjustment needed
+          if (centerDistanceYPixels < 0) {
+            feedbackMessage = "Step back from camera"
+          } else {
+            feedbackMessage = "Move closer to camera"
+          }
         }
-        if (bodyCenterY < 0.5) {
-          feedbackMessage = feedbackMessage.replace("step back", "move closer")
-        }
-      } else if (!isHorizontallyCentered) {
-        // Only horizontal adjustment needed
-        if (bodyCenterX < 0.5) {
-          feedbackMessage = "Move right to center"
-        } else {
-          feedbackMessage = "Move left to center"
-        }
-      } else {
-        // Only vertical adjustment needed
-        if (bodyCenterY < 0.5) {
-          feedbackMessage = "Step back from camera"
-        } else {
-          feedbackMessage = "Move closer to camera"
-        }
-      }
       feedbackType = 'warning'
       adjustmentNeeded = 'center_yourself'
     }
@@ -487,7 +490,7 @@ const analyzeUserPosition = (
     adjustmentNeeded = 'move_closer'
   } else {
     // Check if user is very close but not quite perfect
-    if (centerDeviationXPixels < 20 && centerDeviationYPixels < 20) {
+    if (Math.abs(centerDistanceXPixels) < 20 && Math.abs(centerDistanceYPixels) < 20) {
       feedbackMessage = "Great! Just a tiny adjustment needed"
       feedbackType = 'warning'
       adjustmentNeeded = 'center_yourself'
@@ -885,7 +888,11 @@ export function MeasurementsStepImpl({
   // Update position feedback when pose results change
   useEffect(() => {
     if (canvasRef.current && poseResults && selectedStyleId) {
-      const feedback = analyzeUserPosition(poseResults, selectedStyleId, canvasRef.current.width, canvasRef.current.height)
+      const scale = parseFloat(canvasRef.current.dataset.videoScale || '1')
+      const offsetX = parseFloat(canvasRef.current.dataset.videoOffsetX || '0')
+      const offsetY = parseFloat(canvasRef.current.dataset.videoOffsetY || '0')
+      
+      const feedback = analyzeUserPosition(poseResults, selectedStyleId, canvasRef.current.width, canvasRef.current.height, scale, offsetX, offsetY)
       setPositionFeedback(feedback)
       // Also update the pose detection hook with position feedback for stability calculations
       updatePositionFeedback(feedback)
@@ -1336,11 +1343,11 @@ export function MeasurementsStepImpl({
       const bodyCenterCanvasX = canvas.width - (bodyCenterX * scale + offsetX)
       const bodyCenterCanvasY = bodyCenterY * scale + offsetY
       
-      // Calculate deviation in pixels for display
-      const screenCenterX = canvas.width / 2
-      const screenCenterY = canvas.height / 2
-      const centerDeviationXPixels = Math.abs(bodyCenterCanvasX - screenCenterX)
-      const centerDeviationYPixels = Math.abs(bodyCenterCanvasY - screenCenterY)
+             // Calculate distance in pixels for display
+       const screenCenterX = canvas.width / 2
+       const screenCenterY = canvas.height / 2
+       const centerDistanceXPixels = bodyCenterCanvasX - screenCenterX
+       const centerDistanceYPixels = bodyCenterCanvasY - screenCenterY
       
       // Draw body center indicator
       ctx.save()
@@ -1371,7 +1378,7 @@ export function MeasurementsStepImpl({
       ctx.textAlign = 'center'
       ctx.globalAlpha = 0.9
       
-      const deviationText = `${centerDeviationXPixels.toFixed(0)}px`
+             const deviationText = `${centerDistanceXPixels.toFixed(0)}px`
       const textX = bodyCenterCanvasX
       const textY = bodyCenterCanvasY - 25
       
@@ -1386,9 +1393,9 @@ export function MeasurementsStepImpl({
       
       ctx.restore()
       
-      // Draw tolerance zones
-      const horizontalTolerance = 0.20
-      const verticalTolerance = 0.25
+             // Draw tolerance zones
+       const horizontalTolerance = 0.15
+       const verticalTolerance = 0.20
       
       // Calculate tolerance zones in actual canvas pixels
       const toleranceLeft = screenCenterX - (horizontalTolerance * canvas.width)
@@ -2238,7 +2245,7 @@ export function MeasurementsStepImpl({
               ? 'bg-yellow-500/90 text-black'
               : 'bg-red-500/90 text-white'
           }`}>
-            {positionFeedback.feedbackMessage}
+                         <div>{positionFeedback.feedbackMessage}</div>
           </div>
         )}
 
