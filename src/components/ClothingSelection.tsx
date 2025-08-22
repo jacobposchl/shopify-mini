@@ -324,7 +324,9 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
 
   const isLoading = loading
 
-  const handleItemSelect = (item: ClothingItem) => setSelectedItem(item)
+  const handleItemSelect = (item: ClothingItem) =>
+    setSelectedItem((prev) => (prev?.id === item.id ? null : item)) // <-- toggle select/deselect
+
   const handleContinue = () => {
     if (selectedItem) onItemSelect(selectedItem)
   }
@@ -495,7 +497,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                   className={`relative rounded-lg p-3 border border-white cursor-pointer transition-all duration-200 ${
                     isSelected ? 'ring-2 ring-white scale-105' : 'hover:bg-white/5 hover:scale-102'
                   }`}
-                  onClick={() => setSelectedItem(item)}
+                  onClick={() => handleItemSelect(item)}
                 >
                   {/* Image */}
                   <div className="aspect-square mb-3 rounded-md overflow-hidden bg-white/10">
@@ -516,7 +518,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                     )}
                   </div>
 
-                  {/* Info (all text white) */}
+                  {/* Info */}
                   <div className="space-y-1">
                     <h3 className="font-medium text-white text-sm line-clamp-2">{item.name}</h3>
                     <p className="text-white text-xs">{item.brand}</p>
