@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useProductSearch } from '@shopify/shop-minis-react'
+import { useProductSearch, useProductVariants } from '@shopify/shop-minis-react'
 import { BackButton } from './BackButton'
 import { ProductImage } from './ProductImage'
 import type { ClothingItem, Company } from '../types'
@@ -11,7 +11,7 @@ interface ClothingSelectionProps {
   selectedCompany?: Company
 }
 
-// Formats "USD 12.34" → "$12.34" (and supports other currencies via Intl)
+/* ---------- Price helpers ---------- */
 function formatPrice(amount: string | number | null | undefined, currencyCode?: string) {
   if (amount === null || amount === undefined) return 'Price not available'
   const num = typeof amount === 'number' ? amount : parseFloat(amount)
@@ -19,120 +19,209 @@ function formatPrice(amount: string | number | null | undefined, currencyCode?: 
   try {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currencyCode || 'USD'
+      currency: currencyCode || 'USD',
     }).format(num)
   } catch {
     return `$${num.toFixed(2)}`
   }
 }
 
+/* ---------- Size helpers ---------- */
+const ALPHA_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'XXXXL', 'One Size']
+
+function normalizeSizeValue(raw?: string | null): string | null {
+  if (!raw) return null
+  let v = String(raw).trim()
+
+  // Strip prefixes like "US ", "EU ", "UK "
+  v = v.replace(/^(US|EU|UK)\s*/i, '')
+
+  const lowered = v.toLowerCase()
+  const compact = lowered.replace(/[\s-]/g, '') // <-- handles "2 XL", "3-XL", "2X LARGE" patterns
+
+  // One size
+  if (/(^one\s*-?\s*size$|^os$|^o\/s$)/i.test(lowered)) return 'One Size'
+
+  // Alpha sizes
+  if (/^(xxs|2xs)$/.test(compact)) return 'XXS'
+  if (/^(xs|xsmall|extrasmall)$/.test(compact)) return 'XS'
+  if (/^(s|small)$/.test(compact)) return 'S'
+  if (/^(m|medium)$/.test(compact)) return 'M'
+  if (/^(l|large)$/.test(compact)) return 'L'
+  if (/^(xl|xlarge|extralarge)$/.test(compact)) return 'XL'
+
+  // Extended sizes — now robust to "2XL", "2 XL", "2X-LARGE", etc.
+  if (/^(2xl|xxl|xxlarge|2xlarge|2x)$/.test(compact)) return 'XXL'
+  if (/^(3xl|xxxl|xxxlarge|3xlarge|3x)$/.test(compact)) return 'XXXL'
+  if (/^(4xl|xxxxl|xxxxlarge|4xlarge|4x)$/.test(compact)) return 'XXXXL'
+
+  // Numeric sizes (keep decimal support; don't compact dots)
+  if (/^\d+(\.\d+)?$/.test(lowered)) return String(v.replace(/^0+/, '')) || '0'
+
+  // Return cleaned value with common casing
+  return v.toUpperCase()
+}
+
+function sizeSortKey(a: string): [number, number] {
+  const alphaIdx = ALPHA_ORDER.indexOf(a)
+  if (alphaIdx >= 0) return [0, alphaIdx]
+  const num = parseFloat(a)
+  if (!isNaN(num)) return [1, num]
+  return [2, ALPHA_ORDER.length]
+}
+
+function sortSizes(values: string[]): string[] {
+  return [...values].sort((a, b) => {
+    const [ga, va] = sizeSortKey(a)
+    const [gb, vb] = sizeSortKey(b)
+    if (ga !== gb) return ga - gb
+    if (va !== vb) return (va as number) - (vb as number)
+    return a.localeCompare(b)
+  })
+}
+
+/* Extract sizes from an array of variants (ProductVariant[]) */
+function extractSizesFromVariants(variants: any[] | null | undefined): string[] {
+  const out = new Set<string>()
+  const push = (val?: string | null) => {
+    const n = normalizeSizeValue(val)
+    if (n) out.add(n)
+  }
+
+  if (variants && Array.isArray(variants)) {
+    variants.forEach((variant) => {
+      // 1) selectedOptions: [{ name, value }]
+      const so = variant?.selectedOptions
+      if (Array.isArray(so)) {
+        so.forEach((opt: any) => {
+          if (String(opt?.name || '').toLowerCase().includes('size')) {
+            push(opt?.value)
+          }
+        })
+      }
+
+      // 2) fallback: parse from title parts like "M / Black" or "2 XL / Navy"
+      if (typeof variant?.title === 'string') {
+        const parts = variant.title.split('/').map((s: string) => s.trim())
+        const guess =
+          parts.find((p) =>
+            /^(xxs|xs|s|m|l|xl|xxl|xxxl|xxxxl|one\s*-?\s*size|os|o\/s|\d+(\.\d+)?|2\s*xl|3\s*xl|2x|3x)$/i.test(
+              p
+            ),
+          ) || null
+        push(guess)
+      }
+    })
+  }
+
+  // If more than one size found and 'One Size' is present, drop 'One Size'
+  if (out.size > 1 && out.has('One Size')) out.delete('One Size')
+
+  const list = sortSizes([...out])
+  return list.length ? list : ['One Size']
+}
+
+/* ---------- Per-card sizes (uses useProductVariants) ---------- */
+function ProductSizesBadges({ productId }: { productId: string }) {
+  const { variants, loading } = useProductVariants({ id: productId, first: 50 })
+  const sizes = useMemo(() => extractSizesFromVariants(variants || []), [variants])
+
+  if (loading) {
+    // light skeleton
+    return (
+      <div className="flex flex-wrap gap-1 mt-2">
+        <span className="h-5 w-8 bg-gray-100 rounded animate-pulse" />
+        <span className="h-5 w-8 bg-gray-100 rounded animate-pulse" />
+        <span className="h-5 w-10 bg-gray-100 rounded animate-pulse" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1 mt-2">
+      {sizes.slice(0, 6).map((size) => (
+        <span key={size} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+          {size}
+        </span>
+      ))}
+      {sizes.length > 6 && (
+        <span className="text-xs text-gray-500">+{sizes.length - 6}</span>
+      )}
+    </div>
+  )
+}
+
 export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: ClothingSelectionProps) {
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null)
-  
+
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [selectedGender, setSelectedGender] = useState<string>('all')
   const [selectedPriceRange, setSelectedPriceRange] = useState<string>('all')
-  
-  // Get user selections from previous steps (now only company)
+
   const company = selectedCompany
-  
-  // Build search query and filters for Shopify
+
+  // Build search query
   const searchQuery = useMemo(() => {
     const terms: string[] = []
     if (company?.name) terms.push(company.name)
-    
-    if (terms.length === 0) {
-      return 'clothing apparel'
-    }
-    
+    if (terms.length === 0) return 'clothing apparel'
     return terms.join(' ')
   }, [company?.name])
 
-  // Ensure we have a valid search query
   const finalSearchQuery = searchQuery.trim() || 'clothing apparel'
 
   const filters: ProductFilters = useMemo(() => {
     const filters: ProductFilters = {}
-    // Filters intentionally minimal for now
     return filters
   }, [])
 
-  // Use the official Shopify Minis SDK hook
   const { products: shopifyProducts, loading, error } = useProductSearch({
     query: finalSearchQuery,
-    // filters, // disabled while testing basic search
+    // filters, // re-enable when needed
     sortBy: 'RELEVANCE' as ProductSearchSortBy,
     first: 50,
-    includeSensitive: false
+    includeSensitive: false,
   })
 
   // Transform Shopify products to our ClothingItem format
   const products: ClothingItem[] = useMemo(() => {
     if (!shopifyProducts) return []
-    
+
     return shopifyProducts.map((product) => {
-      // Extract all variant options that look like sizes
-      const sizes = product.variants?.reduce((acc: string[], variant) => {
-        const sizeOptions = variant.selectedOptions?.filter(opt => 
-          opt.name.toLowerCase().includes('size')
-        ) || []
-
-        sizeOptions.forEach(opt => {
-          const size = opt.value.toUpperCase()
-            .replace('SMALL', 'S')
-            .replace('MEDIUM', 'M')
-            .replace('LARGE', 'L')
-            .replace('X-LARGE', 'XL')
-            .replace('2XL', 'XXL')
-            .replace('3XL', 'XXXL')
-          
-          if (!acc.includes(size)) {
-            acc.push(size)
-          }
-        })
-
-        return acc
-      }, [])
-
-      // Sort sizes in standard order
-      const sizeOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
-      const sortedSizes = sizes?.sort((a, b) => 
-        sizeOrder.indexOf(a) - sizeOrder.indexOf(b)
-      ) || ['One Size']
-
       return {
         id: product.id,
         name: product.title,
         brand: product.shop.name,
         style: 'Unknown',
         subStyle: 'Unknown',
-        // ✅ Use currency symbol via Intl instead of "USD 12.34"
-        price: product.price?.amount != null
-          ? formatPrice(product.price.amount, product.price.currencyCode)
-          : 'Price not available',
+        price:
+          product.price?.amount != null
+            ? formatPrice(product.price.amount, product.price.currencyCode)
+            : 'Price not available',
         image: product.featuredImage?.url || '',
         colors: [],
-        sizes: sortedSizes,
+        sizes: [], // sizes fetched per card via useProductVariants
         companyId: product.shop.id,
         styleId: '',
         subStyleId: '',
-        shopifyProduct: product
+        shopifyProduct: product,
       }
     })
   }, [shopifyProducts])
 
-  // Dynamically generate clothing categories based on what the shop actually sells
+  // Build categories dynamically
   const availableCategories = useMemo(() => {
     if (!products.length) return []
-    
+
     const categoryMap = new Map<string, number>()
-    
-    products.forEach(product => {
+
+    products.forEach((product) => {
       const productName = product.name.toLowerCase()
       const productType = (product.shopifyProduct as any)?.productType?.toLowerCase() || ''
-      const tags = (product.shopifyProduct as any)?.tags?.map((tag: string) => tag.toLowerCase()) || []
-      
+      const tags =
+        ((product.shopifyProduct as any)?.tags || []).map((tag: string) => tag.toLowerCase())
+
       const categories = [
         { key: 'shirts', keywords: ['shirt', 't-shirt', 'tshirt', 'polo', 'button-down', 'blouse', 'top', 'tank', 'crop'] },
         { key: 'pants', keywords: ['pants', 'jeans', 'trousers', 'slacks', 'chinos', 'khakis', 'cargo', 'joggers', 'sweatpants'] },
@@ -143,62 +232,60 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
         { key: 'activewear', keywords: ['active', 'athletic', 'workout', 'gym', 'sport', 'training', 'leggings'] },
         { key: 'underwear', keywords: ['underwear', 'lingerie', 'bra', 'panties', 'boxers', 'briefs'] },
         { key: 'sleepwear', keywords: ['sleep', 'pajamas', 'pjs', 'nightgown', 'robe', 'loungewear'] },
-        { key: 'swimwear', keywords: ['swim', 'bathing', 'bikini', 'swimsuit', 'beach'] }
+        { key: 'swimwear', keywords: ['swim', 'bathing', 'bikini', 'swimsuit', 'beach'] },
       ]
-      
-      categories.forEach(category => {
-        const hasCategory = category.keywords.some(keyword => 
-          productName.includes(keyword) || 
-          productType.includes(keyword) ||
-          tags.some((tag: string) => tag.includes(keyword))
+
+      categories.forEach((category) => {
+        const hasCategory = category.keywords.some(
+          (keyword) =>
+            productName.includes(keyword) ||
+            productType.includes(keyword) ||
+            tags.some((tag: string) => tag.includes(keyword)),
         )
-        
         if (hasCategory) {
           categoryMap.set(category.key, (categoryMap.get(category.key) || 0) + 1)
         }
       })
     })
-    
+
     return Array.from(categoryMap.entries())
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .map(([category]) => category)
   }, [products])
 
   // Apply filters to products
   const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      // Category filter - check against available categories
+    return products.filter((product) => {
       if (selectedCategory) {
         const productName = product.name.toLowerCase()
         const productType = (product.shopifyProduct as any)?.productType?.toLowerCase() || ''
-        const tags = (product.shopifyProduct as any)?.tags?.map((tag: string) => tag.toLowerCase()) || []
-        
-        const categoryKeywords = {
-          'shirts': ['shirt', 't-shirt', 'tshirt', 'polo', 'button-down', 'blouse', 'top', 'tank', 'crop'],
-          'pants': ['pants', 'jeans', 'trousers', 'slacks', 'chinos', 'khakis', 'cargo', 'joggers', 'sweatpants'],
-          'dresses': ['dress', 'gown', 'frock', 'jumpsuit', 'romper', 'bodysuit'],
-          'skirts': ['skirt', 'mini', 'midi', 'maxi', 'pencil', 'pleated'],
-          'shorts': ['shorts', 'bermuda', 'athletic shorts'],
-          'outerwear': ['jacket', 'coat', 'blazer', 'sweater', 'hoodie', 'cardigan', 'vest'],
-          'activewear': ['active', 'athletic', 'workout', 'gym', 'sport', 'training', 'leggings'],
-          'underwear': ['underwear', 'lingerie', 'bra', 'panties', 'boxers', 'briefs'],
-          'sleepwear': ['sleep', 'pajamas', 'pjs', 'nightgown', 'robe', 'loungewear'],
-          'swimwear': ['swim', 'bathing', 'bikini', 'swimsuit', 'beach']
+        const tags =
+          ((product.shopifyProduct as any)?.tags || []).map((tag: string) => tag.toLowerCase())
+
+        const categoryKeywords: Record<string, string[]> = {
+          shirts: ['shirt', 't-shirt', 'tshirt', 'polo', 'button-down', 'blouse', 'top', 'tank', 'crop'],
+          pants: ['pants', 'jeans', 'trousers', 'slacks', 'chinos', 'khakis', 'cargo', 'joggers', 'sweatpants'],
+          dresses: ['dress', 'gown', 'frock', 'jumpsuit', 'romper', 'bodysuit'],
+          skirts: ['skirt', 'mini', 'midi', 'maxi', 'pencil', 'pleated'],
+          shorts: ['shorts', 'bermuda', 'athletic shorts'],
+          outerwear: ['jacket', 'coat', 'blazer', 'sweater', 'hoodie', 'cardigan', 'vest'],
+          activewear: ['active', 'athletic', 'workout', 'gym', 'sport', 'training', 'leggings'],
+          underwear: ['underwear', 'lingerie', 'bra', 'panties', 'boxers', 'briefs'],
+          sleepwear: ['sleep', 'pajamas', 'pjs', 'nightgown', 'robe', 'loungewear'],
+          swimwear: ['swim', 'bathing', 'bikini', 'swimsuit', 'beach'],
         }
-        
-        const keywords = (categoryKeywords as any)[selectedCategory] || []
-        const hasCategory = keywords.some((keyword: string) => 
-          productName.includes(keyword) || 
-          productType.includes(keyword) ||
-          tags.some((tag: string) => tag.includes(keyword))
+
+        const keywords = categoryKeywords[selectedCategory] || []
+        const hasCategory = keywords.some(
+          (keyword) =>
+            productName.includes(keyword) ||
+            productType.includes(keyword) ||
+            tags.some((tag: string) => tag.includes(keyword)),
         )
-        
-        if (!hasCategory) {
-          return false
-        }
+
+        if (!hasCategory) return false
       }
-      
-      // Gender filter (basic implementation)
+
       if (selectedGender !== 'all') {
         const productName = product.name.toLowerCase()
         if (selectedGender === 'men' && (productName.includes('women') || productName.includes('female'))) {
@@ -208,10 +295,8 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
           return false
         }
       }
-      
-      // Price range filter
+
       if (selectedPriceRange !== 'all') {
-        // Extract numeric part from formatted price like "$123.45"
         const price = parseFloat(product.price.replace(/[^0-9.]/g, ''))
         if (!isNaN(price)) {
           switch (selectedPriceRange) {
@@ -230,28 +315,19 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
           }
         }
       }
-      
+
       return true
     })
   }, [products, selectedCategory, selectedGender, selectedPriceRange])
 
   const isLoading = loading
-  const useMockData = false
-  
-  const handleItemSelect = (item: ClothingItem) => {
-    setSelectedItem(item)
-  }
-  
-  const handleContinue = () => {
-    if (selectedItem) {
-      onItemSelect(selectedItem)
-    }
-  }
 
-  const handleBack = () => {
-    onBack()
+  const handleItemSelect = (item: ClothingItem) => setSelectedItem(item)
+  const handleContinue = () => {
+    if (selectedItem) onItemSelect(selectedItem)
   }
-  
+  const handleBack = () => onBack()
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -265,7 +341,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
       </div>
     )
   }
-  
+
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -275,8 +351,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
             <div className="text-red-500 text-6xl mb-4">⚠️</div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Oops! Something went wrong</h2>
             <p className="text-gray-600 mb-4">We couldn't load the products right now.</p>
-            
-            {/* Show detailed error information for debugging */}
+
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-left">
                 <p className="text-sm font-medium text-red-800 mb-2">Error Details:</p>
@@ -285,19 +360,16 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                 </pre>
               </div>
             )}
-            
-            {/* Show search parameters for debugging */}
+
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-left">
               <p className="text-sm font-medium text-gray-800 mb-2">Search Parameters:</p>
               <div className="text-xs text-gray-600 space-y-1">
                 <p>Query: "{finalSearchQuery}"</p>
                 <p>Filters: {JSON.stringify(filters)}</p>
                 <p>Company: {company?.name || 'undefined'}</p>
-                <p>Style: {company?.name || 'undefined'}</p>
-                <p>SubStyle: {company?.name || 'undefined'}</p>
               </div>
             </div>
-            
+
             <button
               onClick={() => window.location.reload()}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -309,22 +381,22 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
       </div>
     )
   }
-  
+
   return (
     <div className="min-h-screen bg-[#550cff]">
       <div className="max-w-md mx-auto p-4">
         <BackButton onClick={handleBack} />
-        
-        {/* Header with selection summary */}
+
+        {/* Header */}
         <div className="text-center mb-6 mt-8">
           <h1 className="text-2xl font-bold text-white mb-2">Select Item</h1>
         </div>
-        
-        {/* Filter Options */}
+
+        {/* Filters */}
         <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
           <h3 className="text-white font-semibold mb-3 text-center">Filter Options</h3>
-          
-          {/* Category Filter */}
+
+          {/* Category */}
           <div className="mb-3">
             <label className="block text-white/80 text-sm mb-2">Category</label>
             <select
@@ -333,29 +405,28 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
               className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/40"
             >
               <option value="">All Categories</option>
-              {availableCategories.map(category => (
+              {availableCategories.map((category) => (
                 <option key={category} value={category}>
                   {category.charAt(0).toUpperCase() + category.slice(1)}
                 </option>
               ))}
             </select>
-            
-            {/* Show available categories info */}
+
             {availableCategories.length > 0 && (
               <p className="text-xs text-white/60 mt-1">
                 This shop sells: {availableCategories.slice(0, 3).join(', ')}
                 {availableCategories.length > 3 && ` and ${availableCategories.length - 3} more`}
               </p>
             )}
-            
+
             {availableCategories.length === 0 && products.length > 0 && (
               <p className="text-xs text-white/60 mt-1">
                 No specific clothing categories detected, but {products.length} clothing items available
               </p>
             )}
           </div>
-          
-          {/* Gender Filter */}
+
+          {/* Gender */}
           <div className="mb-3">
             <label className="block text-white/80 text-sm mb-2">Gender</label>
             <div className="flex gap-2">
@@ -364,9 +435,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                   key={gender}
                   onClick={() => setSelectedGender(gender)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    selectedGender === gender
-                      ? 'bg-white text-[#550cff]'
-                      : 'bg-white/20 text-white hover:bg-white/30'
+                    selectedGender === gender ? 'bg-white text-[#550cff]' : 'bg-white/20 text-white hover:bg-white/30'
                   }`}
                 >
                   {gender.charAt(0).toUpperCase() + gender.slice(1)}
@@ -374,8 +443,8 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
               ))}
             </div>
           </div>
-          
-          {/* Price Range Filter */}
+
+          {/* Price */}
           <div className="mb-3">
             <label className="block text-white/80 text-sm mb-2">Price Range</label>
             <select
@@ -390,8 +459,8 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
               <option value="luxury">Luxury ($300+)</option>
             </select>
           </div>
-          
-          {/* Clear Filters Button */}
+
+          {/* Clear */}
           <div className="text-center">
             <button
               onClick={() => {
@@ -405,37 +474,34 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
             </button>
           </div>
         </div>
-        
-        {/* Products count */}
+
+        {/* Count */}
         <div className="mb-4">
           <p className="text-sm text-white/80 text-center">
             {filteredProducts.length} item{filteredProducts.length !== 1 ? 's' : ''} available
           </p>
         </div>
-        
-        {/* Products grid */}
+
+        {/* Grid */}
         {filteredProducts.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 mb-6">
             {filteredProducts.map((item) => {
               const isSelected = selectedItem?.id === item.id
-              
               return (
                 <div
                   key={item.id}
                   className={`relative bg-white rounded-lg p-3 cursor-pointer transition-all duration-200 ${
-                    isSelected 
-                      ? 'ring-2 ring-blue-500 shadow-lg scale-105' 
-                      : 'hover:shadow-md hover:scale-102'
+                    isSelected ? 'ring-2 ring-blue-500 shadow-lg scale-105' : 'hover:shadow-md hover:scale-102'
                   }`}
-                  onClick={() => handleItemSelect(item)}
+                  onClick={() => setSelectedItem(item)}
                 >
-                  {/* Product image */}
+                  {/* Image */}
                   <div className="aspect-square mb-3 rounded-md overflow-hidden bg-gray-100">
                     {item.image ? (
-                      <ProductImage 
-                        src={item.image} 
-                        alt={item.name} 
-                        className="w-full h-full" 
+                      <ProductImage
+                        src={item.image}
+                        alt={item.name}
+                        className="w-full h-full"
                         width={400}
                         height={400}
                         quality={90}
@@ -447,42 +513,18 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                       </div>
                     )}
                   </div>
-                  
-                  {/* Product info */}
+
+                  {/* Info */}
                   <div className="space-y-1">
-                    <h3 className="font-medium text-gray-800 text-sm line-clamp-2">
-                      {item.name}
-                    </h3>
+                    <h3 className="font-medium text-gray-800 text-sm line-clamp-2">{item.name}</h3>
                     <p className="text-gray-600 text-xs">{item.brand}</p>
                     <p className="font-semibold text-blue-600 text-sm">{item.price}</p>
-                    
-                    {/* Sizes and colors */}
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {item.sizes.length > 0 ? (
-                        <>
-                          {item.sizes.slice(0, 3).map((size) => (
-                            <span
-                              key={size}
-                              className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded"
-                            >
-                              {size}
-                            </span>
-                          ))}
-                          {item.sizes.length > 3 && (
-                            <span className="text-xs text-gray-500">
-                              +{item.sizes.length - 3}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-xs text-gray-500">
-                          One Size
-                        </span>
-                      )}
-                    </div>
+
+                    {/* ✅ Real sizes via useProductVariants */}
+                    <ProductSizesBadges productId={item.id} />
                   </div>
-                  
-                  {/* Selection indicator */}
+
+                  {/* Selected tick */}
                   {isSelected && (
                     <div className="absolute top-2 left-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
                       <span className="text-xs">✓</span>
@@ -497,9 +539,8 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
             <h3 className="text-lg font-medium text-white mb-2">No items found</h3>
             <p className="text-white/80 mb-4">
               {selectedCategory || selectedGender !== 'all' || selectedPriceRange !== 'all'
-                ? "No items match your current filters. Try adjusting your filter selections or clearing all filters."
-                : "We couldn't find any items matching your criteria. This might be because the Shopify store doesn't have products matching your selections, or there might be a connection issue."
-              }
+                ? 'No items match your current filters. Try adjusting your filter selections or clearing all filters.'
+                : "We couldn't find any items matching your criteria. This might be because the Shopify store doesn't have products matching your selections, or there might be a connection issue."}
             </p>
             <button
               onClick={handleBack}
@@ -509,8 +550,8 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
             </button>
           </div>
         )}
-        
-        {/* Continue button */}
+
+        {/* Continue */}
         {selectedItem && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
             <div className="max-w-md mx-auto">
