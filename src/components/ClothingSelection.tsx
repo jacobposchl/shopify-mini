@@ -11,6 +11,21 @@ interface ClothingSelectionProps {
   selectedCompany?: Company
 }
 
+// Formats "USD 12.34" → "$12.34" (and supports other currencies via Intl)
+function formatPrice(amount: string | number | null | undefined, currencyCode?: string) {
+  if (amount === null || amount === undefined) return 'Price not available'
+  const num = typeof amount === 'number' ? amount : parseFloat(amount)
+  if (isNaN(num)) return 'Price not available'
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currencyCode || 'USD'
+    }).format(num)
+  } catch {
+    return `$${num.toFixed(2)}`
+  }
+}
+
 export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: ClothingSelectionProps) {
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null)
   
@@ -24,7 +39,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
   
   // Build search query and filters for Shopify
   const searchQuery = useMemo(() => {
-    const terms = []
+    const terms: string[] = []
     if (company?.name) terms.push(company.name)
     
     if (terms.length === 0) {
@@ -39,25 +54,14 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
 
   const filters: ProductFilters = useMemo(() => {
     const filters: ProductFilters = {}
-    
-    // Only add category filter if we have a style - keep it simple
-    // This logic is now redundant as style and subStyle are removed
-    // if (style?.name) {
-    //   // Use a single item array for now
-    //   filters.category = [style.name.toLowerCase()]
-    // }
-    
-    // Skip gender filter for now to test basic functionality
-    // We can add it back once we confirm the basic search works
-    
+    // Filters intentionally minimal for now
     return filters
   }, [])
 
   // Use the official Shopify Minis SDK hook
   const { products: shopifyProducts, loading, error } = useProductSearch({
     query: finalSearchQuery,
-    // Temporarily disable filters to test basic search
-    // filters,
+    // filters, // disabled while testing basic search
     sortBy: 'RELEVANCE' as ProductSearchSortBy,
     first: 50,
     includeSensitive: false
@@ -67,21 +71,55 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
   const products: ClothingItem[] = useMemo(() => {
     if (!shopifyProducts) return []
     
-    return shopifyProducts.map((product) => ({
-      id: product.id,
-      name: product.title,
-      brand: product.shop.name,
-      style: 'Unknown', // style and subStyle are removed
-      subStyle: 'Unknown',
-      price: product.price.amount ? `${product.price.currencyCode} ${product.price.amount}` : 'Price not available',
-      image: product.featuredImage?.url || '',
-      colors: [], // Extract from variants if available
-      sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], // Default sizes for now
-      companyId: product.shop.id,
-      styleId: '', // style and subStyle are removed
-      subStyleId: '',
-      shopifyProduct: product // Keep reference to original Shopify data
-    }))
+    return shopifyProducts.map((product) => {
+      // Extract all variant options that look like sizes
+      const sizes = product.variants?.reduce((acc: string[], variant) => {
+        const sizeOptions = variant.selectedOptions?.filter(opt => 
+          opt.name.toLowerCase().includes('size')
+        ) || []
+
+        sizeOptions.forEach(opt => {
+          const size = opt.value.toUpperCase()
+            .replace('SMALL', 'S')
+            .replace('MEDIUM', 'M')
+            .replace('LARGE', 'L')
+            .replace('X-LARGE', 'XL')
+            .replace('2XL', 'XXL')
+            .replace('3XL', 'XXXL')
+          
+          if (!acc.includes(size)) {
+            acc.push(size)
+          }
+        })
+
+        return acc
+      }, [])
+
+      // Sort sizes in standard order
+      const sizeOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
+      const sortedSizes = sizes?.sort((a, b) => 
+        sizeOrder.indexOf(a) - sizeOrder.indexOf(b)
+      ) || ['One Size']
+
+      return {
+        id: product.id,
+        name: product.title,
+        brand: product.shop.name,
+        style: 'Unknown',
+        subStyle: 'Unknown',
+        // ✅ Use currency symbol via Intl instead of "USD 12.34"
+        price: product.price?.amount != null
+          ? formatPrice(product.price.amount, product.price.currencyCode)
+          : 'Price not available',
+        image: product.featuredImage?.url || '',
+        colors: [],
+        sizes: sortedSizes,
+        companyId: product.shop.id,
+        styleId: '',
+        subStyleId: '',
+        shopifyProduct: product
+      }
+    })
   }, [shopifyProducts])
 
   // Dynamically generate clothing categories based on what the shop actually sells
@@ -95,7 +133,6 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
       const productType = (product.shopifyProduct as any)?.productType?.toLowerCase() || ''
       const tags = (product.shopifyProduct as any)?.tags?.map((tag: string) => tag.toLowerCase()) || []
       
-      // Check for specific clothing categories
       const categories = [
         { key: 'shirts', keywords: ['shirt', 't-shirt', 'tshirt', 'polo', 'button-down', 'blouse', 'top', 'tank', 'crop'] },
         { key: 'pants', keywords: ['pants', 'jeans', 'trousers', 'slacks', 'chinos', 'khakis', 'cargo', 'joggers', 'sweatpants'] },
@@ -122,7 +159,6 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
       })
     })
     
-    // Convert to array and sort by count (most popular categories first)
     return Array.from(categoryMap.entries())
       .sort(([,a], [,b]) => b - a)
       .map(([category]) => category)
@@ -137,7 +173,6 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
         const productType = (product.shopifyProduct as any)?.productType?.toLowerCase() || ''
         const tags = (product.shopifyProduct as any)?.tags?.map((tag: string) => tag.toLowerCase()) || []
         
-        // Check if product matches the selected category
         const categoryKeywords = {
           'shirts': ['shirt', 't-shirt', 'tshirt', 'polo', 'button-down', 'blouse', 'top', 'tank', 'crop'],
           'pants': ['pants', 'jeans', 'trousers', 'slacks', 'chinos', 'khakis', 'cargo', 'joggers', 'sweatpants'],
@@ -151,8 +186,8 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
           'swimwear': ['swim', 'bathing', 'bikini', 'swimsuit', 'beach']
         }
         
-        const keywords = categoryKeywords[selectedCategory as keyof typeof categoryKeywords] || []
-        const hasCategory = keywords.some(keyword => 
+        const keywords = (categoryKeywords as any)[selectedCategory] || []
+        const hasCategory = keywords.some((keyword: string) => 
           productName.includes(keyword) || 
           productType.includes(keyword) ||
           tags.some((tag: string) => tag.includes(keyword))
@@ -176,6 +211,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
       
       // Price range filter
       if (selectedPriceRange !== 'all') {
+        // Extract numeric part from formatted price like "$123.45"
         const price = parseFloat(product.price.replace(/[^0-9.]/g, ''))
         if (!isNaN(price)) {
           switch (selectedPriceRange) {
@@ -200,32 +236,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
   }, [products, selectedCategory, selectedGender, selectedPriceRange])
 
   const isLoading = loading
-  const useMockData = false // We're using real Shopify data now
-  
-  // Helper function to get match quality indicator
-  const getMatchQuality = () => {
-    if (!company) return 'all'
-    
-    const exactMatches = products.filter(product => 
-      product.brand === company.name
-    )
-    
-    if (exactMatches.length > 0) return 'exact'
-    
-    const partialMatches = products.filter(product => {
-      let score = 0
-      if (product.brand === company.name) score++
-      return score >= 1
-    })
-    
-    if (partialMatches.length > 0) return 'partial'
-    return 'fallback'
-  }
-  
-  const matchQuality = getMatchQuality()
-  
-  // Helper function to build search query display (now uses the same logic as the actual search)
-  const getSearchQueryDisplay = () => finalSearchQuery
+  const useMockData = false
   
   const handleItemSelect = (item: ClothingItem) => {
     setSelectedItem(item)
@@ -233,7 +244,6 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
   
   const handleContinue = () => {
     if (selectedItem) {
-      // Call the parent's onItemSelect to handle the selection
       onItemSelect(selectedItem)
     }
   }
@@ -241,8 +251,6 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
   const handleBack = () => {
     onBack()
   }
-  
-
   
   if (isLoading) {
     return (
@@ -410,8 +418,6 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
           <div className="grid grid-cols-2 gap-3 mb-6">
             {filteredProducts.map((item) => {
               const isSelected = selectedItem?.id === item.id
-              const isExactMatch = company && 
-                item.brand === company.name
               
               return (
                 <div
@@ -423,13 +429,6 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                   }`}
                   onClick={() => handleItemSelect(item)}
                 >
-                  {/* Exact match indicator */}
-                  {isExactMatch && (
-                    <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                      Perfect Match
-                    </div>
-                  )}
-                  
                   {/* Product image */}
                   <div className="aspect-square mb-3 rounded-md overflow-hidden bg-gray-100">
                     {item.image ? (
@@ -437,9 +436,9 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                         src={item.image} 
                         alt={item.name} 
                         className="w-full h-full" 
-                        width={400}    // Increased from default
-                        height={400}   // Increased from default
-                        quality={90}   // Increased from default
+                        width={400}
+                        height={400}
+                        quality={90}
                         format="webp"
                       />
                     ) : (
@@ -459,16 +458,26 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                     
                     {/* Sizes and colors */}
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {item.sizes.slice(0, 3).map((size, index) => (
-                        <span
-                          key={index}
-                          className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded"
-                        >
-                          {size}
+                      {item.sizes.length > 0 ? (
+                        <>
+                          {item.sizes.slice(0, 3).map((size) => (
+                            <span
+                              key={size}
+                              className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded"
+                            >
+                              {size}
+                            </span>
+                          ))}
+                          {item.sizes.length > 3 && (
+                            <span className="text-xs text-gray-500">
+                              +{item.sizes.length - 3}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-500">
+                          One Size
                         </span>
-                      ))}
-                      {item.sizes.length > 3 && (
-                        <span className="text-xs text-gray-500">+{item.sizes.length - 3}</span>
                       )}
                     </div>
                   </div>
@@ -509,7 +518,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                 onClick={handleContinue}
                 className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
               >
-                                 Continue
+                Continue
               </button>
             </div>
           </div>
@@ -518,5 +527,3 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
     </div>
   )
 }
-
-
