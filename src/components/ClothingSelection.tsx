@@ -37,7 +37,7 @@ function normalizeSizeValue(raw?: string | null): string | null {
   v = v.replace(/^(US|EU|UK)\s*/i, '')
 
   const lowered = v.toLowerCase()
-  const compact = lowered.replace(/[\s-]/g, '') // <-- handles "2 XL", "3-XL", "2X LARGE" patterns
+  const compact = lowered.replace(/[\s-]/g, '') // handles "2 XL", "3-XL", etc.
 
   // One size
   if (/(^one\s*-?\s*size$|^os$|^o\/s$)/i.test(lowered)) return 'One Size'
@@ -50,15 +50,14 @@ function normalizeSizeValue(raw?: string | null): string | null {
   if (/^(l|large)$/.test(compact)) return 'L'
   if (/^(xl|xlarge|extralarge)$/.test(compact)) return 'XL'
 
-  // Extended sizes — now robust to "2XL", "2 XL", "2X-LARGE", etc.
+  // Extended sizes — robust to "2XL", "3XL", variants
   if (/^(2xl|xxl|xxlarge|2xlarge|2x)$/.test(compact)) return 'XXL'
   if (/^(3xl|xxxl|xxxlarge|3xlarge|3x)$/.test(compact)) return 'XXXL'
   if (/^(4xl|xxxxl|xxxxlarge|4xlarge|4x)$/.test(compact)) return 'XXXXL'
 
-  // Numeric sizes (keep decimal support; don't compact dots)
+  // Numeric sizes
   if (/^\d+(\.\d+)?$/.test(lowered)) return String(v.replace(/^0+/, '')) || '0'
 
-  // Return cleaned value with common casing
   return v.toUpperCase()
 }
 
@@ -130,9 +129,9 @@ function ProductSizesBadges({ productId }: { productId: string }) {
     // light skeleton
     return (
       <div className="flex flex-wrap gap-1 mt-2">
-        <span className="h-5 w-8 bg-gray-100 rounded animate-pulse" />
-        <span className="h-5 w-8 bg-gray-100 rounded animate-pulse" />
-        <span className="h-5 w-10 bg-gray-100 rounded animate-pulse" />
+        <span className="h-5 w-8 bg-white/30 rounded animate-pulse" />
+        <span className="h-5 w-8 bg-white/30 rounded animate-pulse" />
+        <span className="h-5 w-10 bg-white/30 rounded animate-pulse" />
       </div>
     )
   }
@@ -140,12 +139,15 @@ function ProductSizesBadges({ productId }: { productId: string }) {
   return (
     <div className="flex flex-wrap gap-1 mt-2">
       {sizes.slice(0, 6).map((size) => (
-        <span key={size} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+        <span
+          key={size}
+          className="text-xs text-white border border-white px-2 py-1 rounded"
+        >
           {size}
         </span>
       ))}
       {sizes.length > 6 && (
-        <span className="text-xs text-gray-500">+{sizes.length - 6}</span>
+        <span className="text-xs text-white">+{sizes.length - 6}</span>
       )}
     </div>
   )
@@ -490,13 +492,13 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
               return (
                 <div
                   key={item.id}
-                  className={`relative bg-white rounded-lg p-3 cursor-pointer transition-all duration-200 ${
-                    isSelected ? 'ring-2 ring-blue-500 shadow-lg scale-105' : 'hover:shadow-md hover:scale-102'
+                  className={`relative rounded-lg p-3 border border-white cursor-pointer transition-all duration-200 ${
+                    isSelected ? 'ring-2 ring-white scale-105' : 'hover:bg-white/5 hover:scale-102'
                   }`}
                   onClick={() => setSelectedItem(item)}
                 >
                   {/* Image */}
-                  <div className="aspect-square mb-3 rounded-md overflow-hidden bg-gray-100">
+                  <div className="aspect-square mb-3 rounded-md overflow-hidden bg-white/10">
                     {item.image ? (
                       <ProductImage
                         src={item.image}
@@ -508,25 +510,25 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
                         format="webp"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="w-full h-full flex items-center justify-center text-white">
                         <span className="text-2xl">👕</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Info */}
+                  {/* Info (all text white) */}
                   <div className="space-y-1">
-                    <h3 className="font-medium text-gray-800 text-sm line-clamp-2">{item.name}</h3>
-                    <p className="text-gray-600 text-xs">{item.brand}</p>
-                    <p className="font-semibold text-blue-600 text-sm">{item.price}</p>
+                    <h3 className="font-medium text-white text-sm line-clamp-2">{item.name}</h3>
+                    <p className="text-white text-xs">{item.brand}</p>
+                    <p className="font-semibold text-white text-sm">{item.price}</p>
 
-                    {/* ✅ Real sizes via useProductVariants */}
+                    {/* Real sizes via useProductVariants */}
                     <ProductSizesBadges productId={item.id} />
                   </div>
 
                   {/* Selected tick */}
                   {isSelected && (
-                    <div className="absolute top-2 left-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
+                    <div className="absolute top-2 left-2 bg-white text-[#550cff] rounded-full w-6 h-6 flex items-center justify-center">
                       <span className="text-xs">✓</span>
                     </div>
                   )}
