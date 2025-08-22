@@ -113,14 +113,6 @@ export function FinalRecommendation({
                   <span className="text-sm font-medium text-gray-900">{item.brand}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Style</span>
-                  <span className="text-sm font-medium text-gray-900">{item.style}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Fit</span>
-                  <span className="text-sm font-medium text-gray-900">{item.subStyle}</span>
-                </div>
-                <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">Recommended Size</span>
                   <span className="text-sm font-medium text-blue-600">{recommendedSize}</span>
                 </div>
@@ -128,7 +120,6 @@ export function FinalRecommendation({
 
               {/* Color Options */}
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">Available Colors</h3>
                 <div className="flex space-x-2">
                   {item.colors.map((color, index) => (
                     <div
