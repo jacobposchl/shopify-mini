@@ -325,7 +325,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
   const isLoading = loading
 
   const handleItemSelect = (item: ClothingItem) =>
-    setSelectedItem((prev) => (prev?.id === item.id ? null : item)) // <-- toggle select/deselect
+    setSelectedItem((prev) => (prev?.id === item.id ? null : item)) // toggle select/deselect
 
   const handleContinue = () => {
     if (selectedItem) onItemSelect(selectedItem)
@@ -393,7 +393,10 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
 
         {/* Header */}
         <div className="text-center mb-6 mt-8">
-          <h1 className="text-2xl font-bold text-white mb-2">Select Item</h1>
+          {/* ↑ Bigger to match "Select Shop" */}
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-2 tracking-tight">
+            Select Item
+          </h1>
         </div>
 
         {/* Filters */}
