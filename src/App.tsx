@@ -2,6 +2,7 @@ import { useFlowState } from './hooks/useFlowState'
 import { generateRecommendation } from './utils/recommendationEngine'
 import { CompanySelection } from './components/CompanySelection'
 import { ClothingSelection } from './components/ClothingSelection'
+import { HeightInputStep } from './components/HeightInputStep'
 import { MeasurementsStep } from './components/Measurements'
 import { FinalRecommendation } from './components/FinalRecommendation'
 
@@ -10,6 +11,7 @@ export function App() {
   const {
     flowState,
     selectCompany,
+    setUserHeight,
     setMeasurements,
     setRecommendations,
     resetFlow,
@@ -47,8 +49,13 @@ export function App() {
           weight: 165
         }
       }])
-      goToNextStep()
+      goToNextStep() // This will now go to height-input step
     }
+  }
+
+  const handleHeightSubmit = (height: number) => {
+    setUserHeight(height)
+    goToNextStep() // This will go to measurements step
   }
 
   const handleMeasurementsComplete = (measurements: any) => {
@@ -90,6 +97,16 @@ export function App() {
           />
         )
 
+      case 'height-input':
+        return (
+          <HeightInputStep
+            onHeightSubmit={handleHeightSubmit}
+            onBack={handleBack}
+            selectedItemName={flowState.recommendations?.[0]?.item.name}
+            selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
+          />
+        )
+
       case 'measurements':
         return (
           <MeasurementsStep
@@ -101,6 +118,7 @@ export function App() {
             selectedStyleName={flowState.userPreferences.selectedCompany?.name}
             selectedSubStyleName={flowState.userPreferences.selectedCompany?.name}
             selectedStyleId={flowState.userPreferences.selectedCompany?.id}
+            userHeight={flowState.userPreferences.userHeight}
           />
         )
 

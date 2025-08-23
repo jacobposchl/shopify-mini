@@ -275,18 +275,33 @@ const analyzeUserPosition = (
   const config = OUTLINE_CONFIGS[selectedStyleId as keyof typeof OUTLINE_CONFIGS] || OUTLINE_CONFIGS.shirts
   const landmarks = poseResults.landmarks
   
-  // Check if required landmarks are visible and confident
-  const visibleLandmarks = config.requiredLandmarks.filter(index => 
-    landmarks[index] && landmarks[index].confidence > config.confidenceThreshold
+  // Check if the union of upper and lower body joints are visible and confident
+  const topItemJoints = [5, 6, 7, 8, 9, 10, 11, 12] // shoulders, elbows, wrists, hips (waist area)
+  const bottomItemJoints = [11, 12, 13, 14, 15, 16] // hips, knees, ankles
+  const allJoints = [...new Set([...topItemJoints, ...bottomItemJoints])] // Union of all joints
+  
+  const visibleJoints = allJoints.filter(index => 
+    landmarks[index] && landmarks[index].confidence > 0.3
   )
   
-  const isInFrame = visibleLandmarks.length >= config.requiredLandmarks.length * 0.8
+  const isInFrame = visibleJoints.length >= allJoints.length * 0.8
+  const isFullyVisible = visibleJoints.length >= allJoints.length * 0.9
 
   if (!isInFrame) {
     return {
       ...defaultFeedback,
       feedbackMessage: "Please step into camera view",
       adjustmentNeeded: 'center_yourself'
+    }
+  }
+
+  // If less than 90% of joints are visible, suggest moving back from camera
+  if (!isFullyVisible) {
+    return {
+      ...defaultFeedback,
+      feedbackMessage: "Too close to camera",
+      feedbackType: 'warning',
+      adjustmentNeeded: 'move_back'
     }
   }
 
@@ -318,18 +333,14 @@ const analyzeUserPosition = (
         // Calculate scale factor based on shoulder width
         scaleAnalysis.scaleFactor = currentWidth / idealWidth
         
-        // Check if proportions are reasonable
+        // Check if proportions are reasonable - more lenient thresholds
         const ratioDeviation = Math.abs(shoulderToHipRatio - expectedRatio)
-        scaleAnalysis.isGoodScale = ratioDeviation < 0.2 && scaleAnalysis.scaleFactor > 0.6 && scaleAnalysis.scaleFactor < 1.8
+        scaleAnalysis.isGoodScale = ratioDeviation < 0.3 && scaleAnalysis.scaleFactor > 0.4 && scaleAnalysis.scaleFactor < 2.5
         
-        if (scaleAnalysis.scaleFactor < 0.6) {
+        if (scaleAnalysis.scaleFactor < 0.4) {
           scaleAnalysis.feedback = 'Too far from camera'
-        } else if (scaleAnalysis.scaleFactor > 1.8) {
-          scaleAnalysis.feedback = 'Too close to camera'
-        } else if (ratioDeviation > 0.2) {
-          scaleAnalysis.feedback = 'Please face camera directly'
         } else {
-          scaleAnalysis.feedback = 'Good scale'
+          scaleAnalysis.feedback = 'Stay still'
         }
       }
     }
@@ -350,27 +361,22 @@ const analyzeUserPosition = (
         // Calculate scale factor based on hip width
         scaleAnalysis.scaleFactor = currentWidth / idealWidth
         
-        // Check if proportions are reasonable
+        // Check if proportions are reasonable - more lenient thresholds
         const ratioDeviation = Math.abs(hipToKneeRatio - expectedRatio)
-        scaleAnalysis.isGoodScale = ratioDeviation < 0.3 && scaleAnalysis.scaleFactor > 0.6 && scaleAnalysis.scaleFactor < 1.8
+        scaleAnalysis.scaleFactor = currentWidth / idealWidth
         
-        if (scaleAnalysis.scaleFactor < 0.6) {
+        if (scaleAnalysis.scaleFactor < 0.4) {
           scaleAnalysis.feedback = 'Too far from camera'
-        } else if (scaleAnalysis.scaleFactor > 1.8) {
-          scaleAnalysis.feedback = 'Too close to camera'
-        } else if (ratioDeviation > 0.3) {
-          scaleAnalysis.feedback = 'Please face camera directly'
         } else {
-          scaleAnalysis.feedback = 'Good scale'
+          scaleAnalysis.feedback = 'Stay still'
         }
       }
     }
   }
 
-  // Distance analysis - now considers both width and scale
+  // Distance analysis - now considers both width and scale with more lenient thresholds
   const isCorrectDistance = currentWidth >= minWidth && currentWidth <= maxWidth && scaleAnalysis.isGoodScale
-  const isTooClose = currentWidth > maxWidth || scaleAnalysis.scaleFactor > 1.8
-  const isTooFar = currentWidth < minWidth || scaleAnalysis.scaleFactor < 0.6
+  const isTooFar = currentWidth < minWidth * 0.8 || scaleAnalysis.scaleFactor < 0.4
 
   // IMPROVED: Calculate person's actual body center based on clothing type
   let bodyCenterX = 0.5 // Default to center
@@ -478,21 +484,16 @@ const analyzeUserPosition = (
       feedbackType = 'warning'
       adjustmentNeeded = 'center_yourself'
     }
-  } else if (!scaleAnalysis.isGoodScale) {
+    } else if (!scaleAnalysis.isGoodScale) {
     // Use the scale analysis feedback
     feedbackMessage = scaleAnalysis.feedback
-    feedbackType = 'warning'
-    if (scaleAnalysis.scaleFactor > 1.8) {
-      adjustmentNeeded = 'move_back'
-    } else if (scaleAnalysis.scaleFactor < 0.6) {
+    if (scaleAnalysis.scaleFactor < 0.4) {
+      feedbackType = 'warning'
       adjustmentNeeded = 'move_closer'
     } else {
-      adjustmentNeeded = 'center_yourself'
+      feedbackType = 'success'
+      adjustmentNeeded = 'good'
     }
-  } else if (isTooClose) {
-    feedbackMessage = "Please step back from the camera"
-    feedbackType = 'warning'  
-    adjustmentNeeded = 'move_back'
   } else if (isTooFar) {
     feedbackMessage = "Please move closer to the camera"
     feedbackType = 'warning'
@@ -704,6 +705,7 @@ interface MeasurementsStepProps {
   selectedStyleName?: string
   selectedSubStyleName?: string
   selectedStyleId?: string
+  userHeight?: number
 }
 
 export function MeasurementsStepImpl({
@@ -715,34 +717,13 @@ export function MeasurementsStepImpl({
   selectedStyleName,
   selectedSubStyleName,
   selectedStyleId,
+  userHeight,
 }: MeasurementsStepProps) {
+     // Skeleton outline removed - no more positioning needed
+  
   // Simple clothing type detection based on product name
   const getOutlineForClothingType = (productName?: string): string => {
-    if (!productName) return '/skeleton_outline.png'
-    
-    const nameLower = productName.toLowerCase()
-    
-    // Top items (shirts, jackets, sweaters, etc.)
-    const topKeywords = [
-      'shirt', 't-shirt', 'tshirt', 'top', 'blouse', 'polo', 'sweater', 'hoodie', 'jacket', 'coat', 'blazer', 'vest', 'tank', 'crop'
-    ]
-    
-    // Bottom items (pants, shorts, skirts, etc.)
-    const bottomKeywords = [
-      'pants', 'jeans', 'trousers', 'slacks', 'shorts', 'skirt', 'leggings', 'joggers', 'sweatpants'
-    ]
-    
-    // Check if it's a top item
-    if (topKeywords.some(keyword => nameLower.includes(keyword))) {
-      return '/upper-body-outline.png'
-    }
-    
-    // Check if it's a bottom item
-    if (bottomKeywords.some(keyword => nameLower.includes(keyword))) {
-      return '/lower-body-outline.png'
-    }
-    
-    // Default to full body outline
+    // Always use skeleton outline for consistent UI
     return '/skeleton_outline.png'
   }
 
@@ -751,9 +732,21 @@ export function MeasurementsStepImpl({
     const pixelDistance = Math.sqrt(
       Math.pow((landmark2.x - landmark1.x) * scale, 2) + Math.pow((landmark2.y - landmark1.y) * scale, 2),
     )
-    const calibrationFactor = 22.5 / 2.0 // rough, demo-only
-    const distanceInInches = (pixelDistance / 50) * calibrationFactor
-    return distanceInInches.toFixed(1)
+    
+    // Use height-based scaling for more accurate measurements
+    if (userHeight && canvasRef.current) {
+      // Assume the person's height in pixels is roughly 80% of the canvas height
+      // This gives us a pixels-per-inch ratio based on their actual height
+      const estimatedPersonHeightPixels = 0.8 * canvasRef.current.height
+      const pixelsPerInch = estimatedPersonHeightPixels / userHeight
+      const distanceInInches = pixelDistance / pixelsPerInch
+      return distanceInInches.toFixed(1)
+    } else {
+      // Fallback to old calibration if no height provided
+      const calibrationFactor = 22.5 / 2.0 // rough, demo-only
+      const distanceInInches = (pixelDistance / 50) * calibrationFactor
+      return distanceInInches.toFixed(1)
+    }
   }
 
   const calculateRealMeasurements = (landmarks: any[], scale: number, clothingType: string) => {
@@ -764,7 +757,7 @@ export function MeasurementsStepImpl({
       shoulders: 0,
       armLength: 0,
       inseam: 0,
-      height: 70,
+      height: userHeight || 70, // Use user's actual height if available
       weight: 165,
     }
 
@@ -1105,79 +1098,7 @@ export function MeasurementsStepImpl({
   
 
     
-    // Draw style-specific outline image
-    const drawStyleSpecificOutline = () => {
-      console.log('Drawing style-specific outline for product:', selectedItemName)
-      
-      // Get the appropriate outline image based on clothing type
-      const imagePath = getOutlineForClothingType(selectedItemName || '')
-      console.log('Selected outline image:', imagePath, 'for product:', selectedItemName)
-      
-      // Create or get the appropriate image element
-      if (!window.outlineImage || window.outlineImage.src !== window.location.origin + imagePath) {
-        if (window.outlineImage) {
-          window.outlineImage.onload = null // Remove old event listeners
-        }
-        window.outlineImage = new Image()
-        window.outlineImage.src = imagePath
-        window.outlineImage.onload = () => {
-          console.log('Outline image loaded successfully:', imagePath)
-          // Redraw the outline once image is loaded
-          if (canvasRef.current && window.outlineImage) {
-            const canvas = canvasRef.current
-            const ctx = canvas.getContext('2d')
-            if (ctx) {
-              drawOutlineToCanvas(ctx, canvas, window.outlineImage)
-            }
-          }
-        }
-        window.outlineImage.onerror = (err) => {
-          console.error('Failed to load outline image:', imagePath, err)
-        }
-      }
-      
-      // Draw the image if it's loaded
-      if (window.outlineImage && window.outlineImage.complete && window.outlineImage.naturalHeight !== 0) {
-        drawOutlineToCanvas(ctx, canvas, window.outlineImage)
-      }
-    }
-    
-    const drawOutlineToCanvas = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, img: HTMLImageElement) => {
-      if (!img) return
-      
-      // Determine if this is a top or bottom item
-      const isTopItem = getOutlineForClothingType(selectedItemName || '') === '/upper-body-outline.png'
-      
-      // Calculate position and scale
-      const centerX = canvas.width / 2
-      let centerY: number
-      
-             if (isTopItem) {
-         // Top items: position higher up from center for better visibility
-         centerY = canvas.height * 0.4
-       } else {
-         // Bottom items: position higher up from bottom edge for better visibility
-         centerY = canvas.height * 0.65
-       }
-      
-      // Scale image to fit nicely on screen (adjust these values as needed)
-      const targetWidth = 200
-      const targetHeight = (img.height / img.width) * targetWidth
-      
-      // Position image centered horizontally and at calculated Y position
-      const x = centerX - targetWidth / 2
-      const y = centerY - targetHeight / 2
-      
-      // Set transparency - make outlines more visible
-      ctx.save()
-      ctx.globalAlpha = 0.50
-      
-      // Draw the image
-      ctx.drawImage(img, x, y, targetWidth, targetHeight)
-      
-      ctx.restore()
-      console.log('Outline drawn successfully for', isTopItem ? 'top' : 'bottom', 'item')
-    }
+         // Outline drawing removed - no more skeleton outline
     
 
 
@@ -1317,8 +1238,7 @@ export function MeasurementsStepImpl({
       ctx.restore()
     }
 
-         // Draw style-specific outline first (behind everything)
-     drawStyleSpecificOutline()
+                   // Outline drawing removed - no more skeleton outline
 
     // Draw positioning guides and tolerance zones
     const drawPositioningGuides = () => {
@@ -1360,92 +1280,7 @@ export function MeasurementsStepImpl({
       
       
       
-                           // Draw tolerance zones
-        const horizontalTolerance = 0.10
-        const verticalTolerance = 0.15
-      
-      // Calculate tolerance zones in actual canvas pixels
-      const toleranceLeft = screenCenterX - (horizontalTolerance * canvas.width)
-      const toleranceRight = screenCenterX + (horizontalTolerance * canvas.width)
-      const toleranceTop = screenCenterY - (verticalTolerance * canvas.height)
-      const toleranceBottom = screenCenterY + (verticalTolerance * canvas.height)
-      
-      ctx.save()
-      ctx.strokeStyle = '#4ecdc4'
-      ctx.lineWidth = 2
-      ctx.globalAlpha = 0.3
-      ctx.setLineDash([5, 5])
-      
-      // Draw tolerance rectangle
-      ctx.beginPath()
-      ctx.rect(toleranceLeft, toleranceTop, toleranceRight - toleranceLeft, toleranceBottom - toleranceTop)
-      ctx.stroke()
-      
-      ctx.restore()
-      
-      // Draw tolerance zone labels
-      ctx.save()
-      ctx.fillStyle = '#4ecdc4'
-      ctx.font = '10px Arial'
-      ctx.textAlign = 'center'
-      ctx.globalAlpha = 0.7
-      
-      // Left boundary label
-      ctx.fillText('L', toleranceLeft, screenCenterY + 20)
-      // Right boundary label  
-      ctx.fillText('R', toleranceRight, screenCenterY + 20)
-      // Top boundary label
-      ctx.fillText('T', screenCenterX, toleranceTop - 5)
-      // Bottom boundary label
-      ctx.fillText('B', screenCenterX, toleranceBottom + 15)
-      
-      ctx.restore()
-      
-      // Draw screen center indicator
-      // const screenCenterX = canvas.width / 2  // Already calculated above
-      // const screenCenterY = canvas.height / 2 // Already calculated above
-      
-      ctx.save()
-      ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 2
-      ctx.globalAlpha = 0.5
-      ctx.setLineDash([3, 3])
-      
-      // Draw vertical center line
-      ctx.beginPath()
-      ctx.moveTo(screenCenterX, 0)
-      ctx.lineTo(screenCenterX, canvas.height)
-      ctx.stroke()
-      
-      // Draw horizontal center line
-      ctx.beginPath()
-      ctx.moveTo(0, screenCenterY)
-      ctx.lineTo(canvas.width, screenCenterY)
-      ctx.stroke()
-      
-      ctx.restore()
-      
-      // Draw screen center point indicator
-      ctx.save()
-      ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 3
-      ctx.globalAlpha = 0.8
-      
-      // Draw crosshair at screen center
-      const screenCrosshairSize = 15
-      ctx.beginPath()
-      ctx.moveTo(screenCenterX - screenCrosshairSize, screenCenterY)
-      ctx.lineTo(screenCenterX + screenCrosshairSize, screenCenterY)
-      ctx.moveTo(screenCenterX, screenCenterY - screenCrosshairSize)
-      ctx.lineTo(screenCenterX, screenCenterY + screenCrosshairSize)
-      ctx.stroke()
-      
-      // Draw circle around screen center
-      ctx.beginPath()
-      ctx.arc(screenCenterX, screenCenterY, 6, 0, 2 * Math.PI)
-      ctx.stroke()
-      
-      ctx.restore()
+                                  // Tolerance zones and boundary labels removed for cleaner UI
     }
     
     // Draw positioning guides
@@ -1456,15 +1291,16 @@ export function MeasurementsStepImpl({
     ctx.lineWidth = 2
     ctx.fillStyle = '#00ff00'
 
-    // Determine which joints to highlight based on clothing type
-    const isTopItem = getOutlineForClothingType(selectedItemName || '') === '/upper-body-outline.png'
-    
-         // Define relevant joints for top vs bottom items - exclude head features, only show body joints
-     const topItemJoints = [5, 6, 7, 8, 9, 10, 11, 12] // shoulders, elbows, wrists, hips (waist area)
-     const bottomItemJoints = [11, 12, 13, 14, 15, 16] // hips, knees, ankles
-    
-    // Use the same logic as the pose detection hook for consistency
-    const relevantJoints = isTopItem ? topItemJoints : bottomItemJoints
+                   // Determine which joints to highlight based on clothing type
+      const config = OUTLINE_CONFIGS[selectedStyleId as keyof typeof OUTLINE_CONFIGS] || OUTLINE_CONFIGS.shirts
+      const isTopItem = config.focusArea.includes('upper')
+      
+      // Always show both upper and lower body joints, but color them differently based on relevance
+      const topItemJoints = [5, 6, 7, 8, 9, 10, 11, 12] // shoulders, elbows, wrists, hips (waist area)
+      const bottomItemJoints = [11, 12, 13, 14, 15, 16] // hips, knees, ankles
+      
+      // Union of all joints to always show both areas
+      const allJoints = [...new Set([...topItemJoints, ...bottomItemJoints])]
     
          // Draw dynamic head box that follows the detected nose position with 3D rotation
      if (isTopItem && poseResults.landmarks[0] && poseResults.landmarks[0].confidence > 0.3) {
@@ -1559,18 +1395,26 @@ export function MeasurementsStepImpl({
        ctx.restore()
      }
     
-    // Only draw prioritized landmarks based on clothing type - hide non-relevant joints
-    poseResults.landmarks.forEach((landmark: any, index: number) => {
-      if (landmark.confidence > 0.3 && relevantJoints.includes(index)) {
-        const x = canvas.width - (landmark.x * scale + offsetX)
-        const y = landmark.y * scale + offsetY
+         // Draw all landmarks but color them based on relevance to the selected clothing type
+     poseResults.landmarks.forEach((landmark: any, index: number) => {
+       if (landmark.confidence > 0.3 && allJoints.includes(index)) {
+         const x = canvas.width - (landmark.x * scale + offsetX)
+         const y = landmark.y * scale + offsetY
 
-        ctx.fillStyle = '#00ff00'
-        ctx.beginPath()
-        ctx.arc(x, y, 8, 0, 2 * Math.PI)
-        ctx.fill()
-      }
-    })
+         // Color landmarks based on relevance: green for relevant area, grey for irrelevant area
+         if (isTopItem && topItemJoints.includes(index)) {
+           ctx.fillStyle = '#00ff00' // Green for relevant upper body
+         } else if (!isTopItem && bottomItemJoints.includes(index)) {
+           ctx.fillStyle = '#00ff00' // Green for relevant lower body
+         } else {
+           ctx.fillStyle = '#808080' // Grey for irrelevant area
+         }
+         
+         ctx.beginPath()
+         ctx.arc(x, y, 8, 0, 2 * Math.PI)
+         ctx.fill()
+       }
+     })
 
     const skeletonConnections = [
       // COMMENTED OUT: All head-related connections to avoid lines to head
@@ -1595,27 +1439,35 @@ export function MeasurementsStepImpl({
       [13, 14], // left knee to right knee
     ]
 
-    // Only draw prioritized skeleton connections based on clothing type - hide non-relevant connections
-    skeletonConnections.forEach(([index1, index2]) => {
-      const landmark1 = poseResults.landmarks[index1]
-      const landmark2 = poseResults.landmarks[index2]
+         // Draw all skeleton connections but color them based on relevance to the selected clothing type
+     skeletonConnections.forEach(([index1, index2]) => {
+       const landmark1 = poseResults.landmarks[index1]
+       const landmark2 = poseResults.landmarks[index2]
 
-      // Only draw connections where both landmarks are prioritized for the clothing type
-      if (landmark1 && landmark2 && 
-          landmark1.confidence > 0.3 && landmark2.confidence > 0.3 &&
-          relevantJoints.includes(index1) && relevantJoints.includes(index2)) {
-        
-        const x1 = canvas.width - (landmark1.x * scale + offsetX)
-        const y1 = landmark1.y * scale + offsetY
-        const x2 = canvas.width - (landmark2.x * scale + offsetX)
-        const y2 = landmark2.y * scale + offsetY
+       // Draw all connections where both landmarks are visible
+       if (landmark1 && landmark2 && 
+           landmark1.confidence > 0.3 && landmark2.confidence > 0.3 &&
+           allJoints.includes(index1) && allJoints.includes(index2)) {
+         
+         const x1 = canvas.width - (landmark1.x * scale + offsetX)
+         const y1 = landmark1.y * scale + offsetY
+         const x2 = canvas.width - (landmark2.x * scale + offsetX)
+         const y2 = landmark2.y * scale + offsetY
 
-        ctx.strokeStyle = '#00ff00'
-        ctx.lineWidth = 3
-        ctx.beginPath()
-        ctx.moveTo(x1, y1)
-        ctx.lineTo(x2, y2)
-        ctx.stroke()
+         // Color connections based on relevance: green for relevant area, grey for irrelevant area
+         if (isTopItem && topItemJoints.includes(index1) && topItemJoints.includes(index2)) {
+           ctx.strokeStyle = '#00ff00' // Green for relevant upper body connections
+         } else if (!isTopItem && bottomItemJoints.includes(index1) && bottomItemJoints.includes(index2)) {
+           ctx.strokeStyle = '#00ff00' // Green for relevant lower body connections
+         } else {
+           ctx.strokeStyle = '#808080' // Grey for irrelevant area connections
+         }
+         
+         ctx.lineWidth = 3
+         ctx.beginPath()
+         ctx.moveTo(x1, y1)
+         ctx.lineTo(x2, y2)
+         ctx.stroke()
 
                  // Draw distance measurements for relevant connections
          // COMMENTED OUT: Number texts for now
@@ -2203,19 +2055,49 @@ export function MeasurementsStepImpl({
           poseStability={poseStability}
         />
 
-                 {/* Position feedback */}
-         {positionFeedback && !isDemoMode && !measurements && !isProcessing && (
-           <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg font-medium text-center max-w-xs z-40 ${
-             positionFeedback.feedbackType === 'success' 
-               ? 'bg-green-500/90 text-white' 
-               : positionFeedback.feedbackType === 'warning'
-               ? 'bg-yellow-500/90 text-black'
-               : 'bg-red-500/90 text-white'
-           }`}>
-             <div>{positionFeedback.feedbackMessage}</div>
-             
-           </div>
-         )}
+                          {/* Position feedback */}
+          {positionFeedback && !isDemoMode && !measurements && !isProcessing && (
+            <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg font-medium text-center max-w-xs z-40 ${
+              positionFeedback.feedbackType === 'success' 
+                ? 'bg-green-500/90 text-white' 
+                : positionFeedback.feedbackType === 'warning'
+                ? 'bg-yellow-500/90 text-black'
+                : 'bg-red-500/90 text-white'
+            }`}>
+              <div>{positionFeedback.feedbackMessage}</div>
+            </div>
+          )}
+
+          {/* Measurement conversion display */}
+          {!isDemoMode && !measurements && !isProcessing && selectedStyleId && poseResults?.isDetected && userHeight && canvasRef.current && (
+            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg font-medium text-center max-w-xs z-40 bg-blue-500/90 text-white">
+              <div className="text-sm">
+                {(() => {
+                  const config = OUTLINE_CONFIGS[selectedStyleId as keyof typeof OUTLINE_CONFIGS] || OUTLINE_CONFIGS.shirts
+                  const landmarks = poseResults.landmarks
+                  const canvas = canvasRef.current!
+                  
+                  if (config.focusArea.includes('upper')) {
+                    // For upper body items, show shoulder width
+                    if (landmarks[5] && landmarks[6]) {
+                      const shoulderWidthPixels = Math.abs(landmarks[5].x - landmarks[6].x) * canvas.width
+                      const shoulderWidthInches = (shoulderWidthPixels / (0.8 * canvas.height)) * userHeight
+                      return `Shoulder Width: ${shoulderWidthPixels.toFixed(0)}px = ${shoulderWidthInches.toFixed(1)}"`
+                    }
+                  } else {
+                    // For lower body items, show hip width
+                    if (landmarks[11] && landmarks[12]) {
+                      const hipWidthPixels = Math.abs(landmarks[11].x - landmarks[12].x) * canvas.width
+                      const hipWidthInches = (hipWidthPixels / (0.8 * canvas.height)) * userHeight
+                      return `Hip Width: ${hipWidthPixels.toFixed(0)}px = ${hipWidthInches.toFixed(1)}"`
+                    }
+                  }
+                  
+                  return `Height: ${userHeight}" | Scale: ${((0.8 * canvas.height) / userHeight).toFixed(1)}px/inch`
+                })()}
+              </div>
+            </div>
+          )}
          
          
 

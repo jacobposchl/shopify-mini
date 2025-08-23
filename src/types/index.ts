@@ -102,6 +102,7 @@ export interface UserPreferences {
   selectedCompany?: Company
   selectedStyle?: Style
   selectedSubStyle?: SubStyle
+  userHeight?: number
 }
 
 export interface Measurements {
@@ -128,6 +129,7 @@ export type FlowStep =
   | 'style-selection' 
   | 'substyle-selection'
   | 'clothing-selection'
+  | 'height-input'
   | 'measurements'
   | 'final-recommendation'
 

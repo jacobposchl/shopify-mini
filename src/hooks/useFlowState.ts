@@ -48,6 +48,16 @@ export function useFlowState() {
     }))
   }, [])
 
+  const setUserHeight = useCallback((height: number) => {
+    setFlowState(prev => ({
+      ...prev,
+      userPreferences: {
+        ...prev.userPreferences,
+        userHeight: height
+      }
+    }))
+  }, [])
+
   const setMeasurements = useCallback((measurements: Measurements) => {
     setFlowState(prev => ({
       ...prev,
@@ -70,6 +80,7 @@ export function useFlowState() {
     const stepOrder: FlowStep[] = [
       'company-selection',
       'clothing-selection',
+      'height-input',
       'measurements',
       'final-recommendation'
     ]
@@ -84,6 +95,7 @@ export function useFlowState() {
     const stepOrder: FlowStep[] = [
       'company-selection',
       'clothing-selection',
+      'height-input',
       'measurements',
       'final-recommendation'
     ]
@@ -100,6 +112,7 @@ export function useFlowState() {
     selectCompany,
     selectStyle,
     selectSubStyle,
+    setUserHeight,
     setMeasurements,
     setRecommendations,
     resetFlow,
