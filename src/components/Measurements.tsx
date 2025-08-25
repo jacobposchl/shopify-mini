@@ -8,7 +8,7 @@ import { Logger } from '../utils/Logger'
 import { ConfidenceThreshold } from './ConfidenceThreshold'
 import { getClothingInstructions } from '../data/poseRequirements'
 import { BackButton } from './BackButton'
-import { CameraDebugOverlay } from './CameraDebugOverlay'
+
 
 // Extend Window interface to include our custom property
 declare global {
@@ -740,8 +740,8 @@ export function MeasurementsStepImpl({
         
         // Add compensation for nose/eyes to top of head (typically 4-5 inches)
         const eyesToTopOfHead = 4.5 // inches - distance from nose/eyes to top of head
-        const adjustedUserHeight = userHeight + eyesToTopOfHead
-        const pixelsPerInch = personHeightPixels / adjustedUserHeight
+        const noseToAnkleHeight = userHeight - eyesToTopOfHead 
+      const pixelsPerInch = personHeightPixels / noseToAnkleHeight
         
         // Convert pixel distance - landmarks already in pixels
         const pixelDistanceInCanvas = Math.sqrt(
@@ -842,7 +842,7 @@ export function MeasurementsStepImpl({
   const [debugBufferSize, setDebugBufferSize] = useState(0)
   const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
   const [positionFeedback, setPositionFeedback] = useState<PositionFeedback | null>(null)
-  const [showDebugOverlay, setShowDebugOverlay] = useState(false)
+
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const {
@@ -997,31 +997,31 @@ export function MeasurementsStepImpl({
   useEffect(() => {
     setDebugEffectCount((prev) => prev + 1)
 
-    // COMMENTED OUT: Auto-progress when validation reaches 100%
-    // if (validation && validation.isValid && validation.progress >= 1.0 && !measurements && !debugAutoTrigger) {
-    //   setDebugAutoTrigger(true)
+    // Auto-progress when validation reaches 100%
+    if (validation && validation.isValid && validation.progress >= 1.0 && !measurements && !debugAutoTrigger) {
+          setDebugAutoTrigger(true)
 
-    //   try {
-    //     const averaged = averageMeasurements(measurementBuffer)
-    //     setMeasurements(averaged)
-    //     if (!isDemoMode) stopCamera()
-    //     onMeasurementsComplete(averaged)
-    //   } catch (error) {
-    //     setDebugError((error as Error).message)
-    //     const fallback = {
-    //       chest: 42,
-    //       waist: 32,
-    //       hips: 38,
-    //       shoulders: 18,
-    //       armLength: 25,
-    //       inseam: 32,
-    //       height: 70,
-    //       weight: 165,
-    //     }
-    //     setMeasurements(fallback)
-    //     onMeasurementsComplete(fallback)
-    //   }
-    // }
+          try {
+            const averaged = averageMeasurements(measurementBuffer)
+            setMeasurements(averaged)
+            if (!isDemoMode) stopCamera()
+            onMeasurementsComplete(averaged)
+          } catch (error) {
+            setDebugError((error as Error).message)
+            const fallback = {
+          chest: 42,
+          waist: 32,
+          hips: 38,
+          shoulders: 18,
+          armLength: 25,
+          inseam: 32,
+          height: 70,
+          weight: 165,
+        }
+            setMeasurements(fallback)
+            onMeasurementsComplete(fallback)
+          }
+    }
 
     if (!validation || !validation.isValid || validation.progress < 1.0) {
       setDebugAutoTrigger(false)
@@ -2051,14 +2051,7 @@ export function MeasurementsStepImpl({
         <div className="absolute top-4 left-4 z-10">
           <BackButton onClick={onCancel} />
         </div>
-        <div className="absolute top-4 right-4 z-10">
-          <button
-            onClick={() => setShowDebugOverlay(true)}
-            className="bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-700"
-          >
-            🐛 Debug
-          </button>
-        </div>
+
 
         <div className="px-4 pt-16 pb-4 text-center">
           <h1 className="text-xl font-bold text-white">Get Your Measurements</h1>
@@ -2077,90 +2070,9 @@ export function MeasurementsStepImpl({
           poseStability={poseStability}
         />
 
-                          {/* Position feedback */}
-          {positionFeedback && !isDemoMode && !measurements && !isProcessing && (
-            <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg font-medium text-center max-w-xs z-40 ${
-              positionFeedback.feedbackType === 'success' 
-                ? 'bg-green-500/90 text-white' 
-                : positionFeedback.feedbackType === 'warning'
-                ? 'bg-yellow-500/90 text-black'
-                : 'bg-red-500/90 text-white'
-            }`}>
-              <div>{positionFeedback.feedbackMessage}</div>
-            </div>
-          )}
 
-          {/* Enhanced Measurement Debug Display - Right Side */}
-          {!isDemoMode && !measurements && !isProcessing && selectedStyleId && poseResults?.isDetected && userHeight && canvasRef.current && (
-            <div className="absolute top-20 right-4 px-4 py-3 rounded-lg font-medium text-center max-w-sm z-40 bg-black bg-opacity-90 text-white">
-              <div className="text-sm font-mono">
-                {(() => {
-                  const landmarks = poseResults.landmarks
-                  const canvas = canvasRef.current!
-                  
-                  // Calculate height and scale
-                  let pixelsPerInch = 0
-                  let personHeightPixels = 0
-                  let adjustedUserHeight = 0
-                  
-                  if (landmarks[0] && landmarks[15]) {
-                    const noseY = landmarks[0].y  // Landmarks already in pixels
-                    const ankleY = landmarks[15].y // Landmarks already in pixels
-                    personHeightPixels = Math.abs(ankleY - noseY)
-                    
-                    // Add compensation for nose/eyes to top of head (typically 4-5 inches)
-                    const eyesToTopOfHead = 4.5 // inches
-                    adjustedUserHeight = userHeight + eyesToTopOfHead
-                    pixelsPerInch = personHeightPixels / adjustedUserHeight
-                  }
-                  
-                  if (pixelsPerInch > 0) {
-                    return (
-                      <>
-                        {/* Height Section */}
-                        <div className="mb-3 text-left">
-                          <div className="text-xs text-gray-300 mb-1 font-bold">HEIGHT</div>
-                          <div className="mb-1">
-                            <span className="text-gray-300">Input Height:</span> {userHeight} inches
-                          </div>
-                          <div className="mb-1">
-                            <span className="text-gray-300">Pixel Height:</span> {personHeightPixels.toFixed(1)}px
-                          </div>
-                          <div className="mb-1">
-                            <span className="text-gray-300">Calculated Scale:</span> {pixelsPerInch.toFixed(2)} px/in
-                          </div>
-                        </div>
-                        
-                        {/* Shoulder Width Section */}
-                        <div className="mb-3 text-left">
-                          <div className="text-xs text-gray-300 mb-1 font-bold">SHOULDER WIDTH</div>
-                          {landmarks[5] && landmarks[6] ? (
-                            <>
-                              <div className="mb-1">
-                                <span className="text-gray-300">Pixel Distance:</span> {Math.abs(landmarks[5].x - landmarks[6].x).toFixed(1)}px
-                              </div>
-                              <div className="mb-1">
-                                <span className="text-gray-300">Converted to Inches:</span> {(Math.abs(landmarks[5].x - landmarks[6].x) / pixelsPerInch).toFixed(2)} inches
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-gray-400">Shoulder landmarks not detected</div>
-                          )}
-                        </div>
-                      </>
-                    )
-                  }
-                  
-                  return (
-                    <div className="text-center">
-                      <div className="text-gray-300">Height: {userHeight}"</div>
-                      <div className="text-gray-400">Calculating scale...</div>
-                    </div>
-                  )
-                })()}
-              </div>
-            </div>
-          )}
+
+
 
 
          
@@ -2220,51 +2132,27 @@ export function MeasurementsStepImpl({
                 >
                   Agree
                 </button>
-                <button
-                  onClick={() => setShowDebugOverlay(true)}
-                  className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-red-700"
-                >
-                  Debug
-                </button>
+
               </div>
             </div>
           </div>
         )}
 
-        {/* Debug Overlay */}
-        {showDebugOverlay && (
-          <CameraDebugOverlay
-            isVisible={showDebugOverlay}
-            onClose={() => setShowDebugOverlay(false)}
-            poseDetectionStatus={{
-              isInitialized: isPoseInitialized,
-              isLoading: isPoseLoading,
-              error: poseError || '',
-              poseResults: poseResults
-            }}
-            cameraStatus={{
-              isActive: !cameraError && videoRef.current?.srcObject !== null,
-              error: cameraError,
-              stream: videoRef.current?.srcObject as MediaStream || null
-            }}
-            videoElement={videoRef.current}
-            poseStability={poseStability}
-            onForceCameraStart={retryCamera}
-            onForcePoseInit={() => {
-              if (videoRef.current) {
-                initializePose(videoRef.current).catch(console.error)
-              }
-            }}
-          />
-        )}
 
 
 
-        {/* Clothing instructions */}
-        {!isDemoMode && !measurements && !isProcessing && selectedStyleId && (
+
+        {/* Position feedback */}
+        {positionFeedback && !isDemoMode && !measurements && !isProcessing && (
           <div className="absolute bottom-20 left-0 right-0 z-20 px-20">
-            <div className="bg-black/60 backdrop-blur-sm text-white text-center py-3 px-4 rounded-lg">
-              <p className="text-sm font-medium">{getClothingInstructions(selectedStyleId)}</p>
+            <div className={`text-center py-3 px-4 rounded-lg backdrop-blur-sm ${
+              positionFeedback.feedbackType === 'success' 
+                ? 'bg-green-500/90 text-white' 
+                : positionFeedback.feedbackType === 'warning'
+                ? 'bg-yellow-500/90 text-black'
+                : 'bg-red-500/90 text-white'
+            }`}>
+              <p className="text-sm font-medium">{positionFeedback.feedbackMessage}</p>
             </div>
           </div>
         )}
