@@ -2090,9 +2090,9 @@ export function MeasurementsStepImpl({
             </div>
           )}
 
-          {/* Enhanced Measurement Debug Display */}
+          {/* Enhanced Measurement Debug Display - Right Side */}
           {!isDemoMode && !measurements && !isProcessing && selectedStyleId && poseResults?.isDetected && userHeight && canvasRef.current && (
-            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 px-4 py-3 rounded-lg font-medium text-center max-w-sm z-40 bg-black bg-opacity-90 text-white">
+            <div className="absolute top-20 right-4 px-4 py-3 rounded-lg font-medium text-center max-w-sm z-40 bg-black bg-opacity-90 text-white">
               <div className="text-sm font-mono">
                 {(() => {
                   const landmarks = poseResults.landmarks
@@ -2155,6 +2155,114 @@ export function MeasurementsStepImpl({
                     <div className="text-center">
                       <div className="text-gray-300">Height: {userHeight}"</div>
                       <div className="text-gray-400">Calculating scale...</div>
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* Raw Debug Data - Left Side */}
+          {!isDemoMode && !measurements && !isProcessing && selectedStyleId && poseResults?.isDetected && userHeight && canvasRef.current && (
+            <div className="absolute top-20 left-4 px-4 py-3 rounded-lg font-medium text-center max-w-sm z-40 bg-red-900 bg-opacity-90 text-white">
+              <div className="text-sm font-mono">
+                {(() => {
+                  const landmarks = poseResults.landmarks
+                  const canvas = canvasRef.current!
+                  
+                  if (landmarks[0] && landmarks[15]) {
+                    // Raw coordinate debugging
+                    const rawNoseY = landmarks[0].y
+                    const rawAnkleY = landmarks[15].y
+                    const rawDifference = Math.abs(rawAnkleY - rawNoseY)
+                    
+                    // Canvas dimensions
+                    const canvasHeight = canvas.height
+                    const canvasWidth = canvas.width
+                    
+                    // Test calculations
+                    const noseY = rawNoseY * canvasHeight
+                    const ankleY = rawAnkleY * canvasHeight
+                    const personHeightPixels = Math.abs(ankleY - noseY)
+                    
+                    // Log to console for debugging
+                    console.log('🔍 Raw Debug Data:', {
+                      'Raw nose Y coordinate': rawNoseY,
+                      'Raw ankle Y coordinate': rawAnkleY,
+                      'Canvas height': canvasHeight,
+                      'Canvas width': canvasWidth,
+                      'noseY calculated': noseY,
+                      'ankleY calculated': ankleY,
+                      'Raw difference (normalized)': rawDifference,
+                      'Person height (pixels)': personHeightPixels
+                    })
+                    
+                    // Test with raw normalized coordinates
+                    console.log('Raw person height (normalized):', rawDifference)
+                    
+                    return (
+                      <>
+                        <div className="text-xs text-red-200 mb-2 font-bold">RAW DEBUG DATA</div>
+                        
+                        {/* Raw Coordinates */}
+                        <div className="mb-3 text-left">
+                          <div className="text-xs text-red-200 mb-1 font-bold">RAW COORDINATES</div>
+                          <div className="mb-1">
+                            <span className="text-red-200">Nose Y:</span> {rawNoseY.toFixed(4)}
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-red-200">Ankle Y:</span> {rawAnkleY.toFixed(4)}
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-red-200">Raw Diff:</span> {rawDifference.toFixed(4)}
+                          </div>
+                        </div>
+                        
+                        {/* Canvas Info */}
+                        <div className="mb-3 text-left">
+                          <div className="text-xs text-red-200 mb-1 font-bold">CANVAS INFO</div>
+                          <div className="mb-1">
+                            <span className="text-red-200">Width:</span> {canvasWidth}px
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-red-200">Height:</span> {canvasHeight}px
+                          </div>
+                        </div>
+                        
+                        {/* Calculated Values */}
+                        <div className="mb-3 text-left">
+                          <div className="text-xs text-red-200 mb-1 font-bold">CALCULATED</div>
+                          <div className="mb-1">
+                            <span className="text-red-200">Nose Y (px):</span> {noseY.toFixed(1)}px
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-red-200">Ankle Y (px):</span> {ankleY.toFixed(1)}px
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-red-200">Height (px):</span> {personHeightPixels.toFixed(1)}px
+                          </div>
+                        </div>
+                        
+                        {/* Analysis */}
+                        <div className="text-left">
+                          <div className="text-xs text-red-200 mb-1 font-bold">ANALYSIS</div>
+                          <div className="mb-1">
+                            <span className="text-red-200">Expected Raw:</span> 0.4-0.8
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-red-200">Expected Pixels:</span> 200-800px
+                          </div>
+                          <div className={`text-xs ${rawDifference >= 0.4 && rawDifference <= 0.8 ? 'text-green-300' : 'text-red-300'}`}>
+                            Raw Range: {rawDifference >= 0.4 && rawDifference <= 0.8 ? '✅ Normal' : '❌ Abnormal'}
+                          </div>
+                        </div>
+                      </>
+                    )
+                  }
+                  
+                  return (
+                    <div className="text-center">
+                      <div className="text-red-200">No landmarks</div>
                     </div>
                   )
                 })()}
