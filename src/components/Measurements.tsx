@@ -2090,51 +2090,73 @@ export function MeasurementsStepImpl({
             </div>
           )}
 
-          {/* Measurement conversion display */}
+          {/* Enhanced Measurement Debug Display */}
           {!isDemoMode && !measurements && !isProcessing && selectedStyleId && poseResults?.isDetected && userHeight && canvasRef.current && (
-            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg font-medium text-center max-w-xs z-40 bg-blue-500/90 text-white">
-              <div className="text-sm">
+            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 px-4 py-3 rounded-lg font-medium text-center max-w-sm z-40 bg-black bg-opacity-90 text-white">
+              <div className="text-sm font-mono">
                 {(() => {
-                  const config = OUTLINE_CONFIGS[selectedStyleId as keyof typeof OUTLINE_CONFIGS] || OUTLINE_CONFIGS.shirts
                   const landmarks = poseResults.landmarks
                   const canvas = canvasRef.current!
                   
-                  // Use EXACT pose detection measurements - no estimating!
+                  // Calculate height and scale
                   let pixelsPerInch = 0
+                  let personHeightPixels = 0
+                  let adjustedUserHeight = 0
                   
-                  // Measure from nose to ankle - this is what the user's height represents
                   if (landmarks[0] && landmarks[15]) {
                     const noseY = landmarks[0].y * canvas.height
                     const ankleY = landmarks[15].y * canvas.height
-                    const personHeightPixels = Math.abs(ankleY - noseY)
+                    personHeightPixels = Math.abs(ankleY - noseY)
                     
                     // Add compensation for nose/eyes to top of head (typically 4-5 inches)
-                    const eyesToTopOfHead = 4.5 // inches - distance from nose/eyes to top of head
-                    const adjustedUserHeight = userHeight + eyesToTopOfHead
+                    const eyesToTopOfHead = 4.5 // inches
+                    adjustedUserHeight = userHeight + eyesToTopOfHead
                     pixelsPerInch = personHeightPixels / adjustedUserHeight
                   }
                   
                   if (pixelsPerInch > 0) {
-                    if (config.focusArea.includes('upper')) {
-                      // For upper body items, show shoulder width
-                      if (landmarks[5] && landmarks[6]) {
-                        const shoulderWidthPixels = Math.abs(landmarks[5].x - landmarks[6].x) * canvas.width
-                        const shoulderWidthInches = shoulderWidthPixels / pixelsPerInch
-                        return `Shoulder Width: ${shoulderWidthPixels.toFixed(0)}px = ${shoulderWidthInches.toFixed(1)}"`
-                      }
-                    } else {
-                      // For lower body items, show hip width
-                      if (landmarks[11] && landmarks[12]) {
-                        const hipWidthPixels = Math.abs(landmarks[11].x - landmarks[12].x) * canvas.width
-                        const hipWidthInches = hipWidthPixels / pixelsPerInch
-                        return `Hip Width: ${hipWidthPixels.toFixed(0)}px = ${hipWidthInches.toFixed(1)}"`
-                      }
-                    }
-                    
-                    return `Height: ${userHeight}" | Scale: ${pixelsPerInch.toFixed(1)}px/inch`
+                    return (
+                      <>
+                        {/* Height Section */}
+                        <div className="mb-3 text-left">
+                          <div className="text-xs text-gray-300 mb-1 font-bold">HEIGHT</div>
+                          <div className="mb-1">
+                            <span className="text-gray-300">Input Height:</span> {userHeight} inches
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-gray-300">Pixel Height:</span> {personHeightPixels.toFixed(1)}px
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-gray-300">Calculated Scale:</span> {pixelsPerInch.toFixed(2)} px/in
+                          </div>
+                        </div>
+                        
+                        {/* Shoulder Width Section */}
+                        <div className="mb-3 text-left">
+                          <div className="text-xs text-gray-300 mb-1 font-bold">SHOULDER WIDTH</div>
+                          {landmarks[5] && landmarks[6] ? (
+                            <>
+                              <div className="mb-1">
+                                <span className="text-gray-300">Pixel Distance:</span> {Math.abs((landmarks[5].x - landmarks[6].x) * canvas.width).toFixed(1)}px
+                              </div>
+                              <div className="mb-1">
+                                <span className="text-gray-300">Converted to Inches:</span> {(Math.abs((landmarks[5].x - landmarks[6].x) * canvas.width) / pixelsPerInch).toFixed(2)} inches
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-gray-400">Shoulder landmarks not detected</div>
+                          )}
+                        </div>
+                      </>
+                    )
                   }
                   
-                  return `Height: ${userHeight}" | Calculating scale...`
+                  return (
+                    <div className="text-center">
+                      <div className="text-gray-300">Height: {userHeight}"</div>
+                      <div className="text-gray-400">Calculating scale...</div>
+                    </div>
+                  )
                 })()}
               </div>
             </div>
