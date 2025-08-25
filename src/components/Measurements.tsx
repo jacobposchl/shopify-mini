@@ -733,20 +733,34 @@ export function MeasurementsStepImpl({
       Math.pow((landmark2.x - landmark1.x) * scale, 2) + Math.pow((landmark2.y - landmark1.y) * scale, 2),
     )
     
-    // Use height-based scaling for more accurate measurements
-    if (userHeight && canvasRef.current) {
-      // Assume the person's height in pixels is roughly 80% of the canvas height
-      // This gives us a pixels-per-inch ratio based on their actual height
-      const estimatedPersonHeightPixels = 0.8 * canvasRef.current.height
-      const pixelsPerInch = estimatedPersonHeightPixels / userHeight
-      const distanceInInches = pixelDistance / pixelsPerInch
-      return distanceInInches.toFixed(1)
-    } else {
-      // Fallback to old calibration if no height provided
-      const calibrationFactor = 22.5 / 2.0 // rough, demo-only
-      const distanceInInches = (pixelDistance / 50) * calibrationFactor
-      return distanceInInches.toFixed(1)
+    // Use pose detection-based scaling for accurate measurements
+    if (userHeight && canvasRef.current && poseResults?.isDetected) {
+      // Use the EXACT pose detection measurements - no estimating!
+      // Measure from nose to ankle for full height using canvas coordinates
+      if (poseResults.landmarks[0] && poseResults.landmarks[15]) {
+        const noseY = poseResults.landmarks[0].y * canvasRef.current.height
+        const ankleY = poseResults.landmarks[15].y * canvasRef.current.height
+        const personHeightPixels = Math.abs(ankleY - noseY)
+        
+        // Add compensation for nose/eyes to top of head (typically 4-5 inches)
+        const eyesToTopOfHead = 4.5 // inches - distance from nose/eyes to top of head
+        const adjustedUserHeight = userHeight + eyesToTopOfHead
+        const pixelsPerInch = personHeightPixels / adjustedUserHeight
+        
+        // Convert pixel distance to inches using canvas coordinates
+        const pixelDistanceInCanvas = Math.sqrt(
+          Math.pow((landmark2.x - landmark1.x) * canvasRef.current.width, 2) + 
+          Math.pow((landmark2.y - landmark1.y) * canvasRef.current.height, 2)
+        )
+        const distanceInInches = pixelDistanceInCanvas / pixelsPerInch
+        return distanceInInches.toFixed(1)
+      }
     }
+    
+    // Fallback to old calibration if no height or pose detection available
+    const calibrationFactor = 22.5 / 2.0 // rough, demo-only
+    const distanceInInches = (pixelDistance / 50) * calibrationFactor
+    return distanceInInches.toFixed(1)
   }
 
   const calculateRealMeasurements = (landmarks: any[], scale: number, clothingType: string) => {
@@ -2077,23 +2091,42 @@ export function MeasurementsStepImpl({
                   const landmarks = poseResults.landmarks
                   const canvas = canvasRef.current!
                   
-                  if (config.focusArea.includes('upper')) {
-                    // For upper body items, show shoulder width
-                    if (landmarks[5] && landmarks[6]) {
-                      const shoulderWidthPixels = Math.abs(landmarks[5].x - landmarks[6].x) * canvas.width
-                      const shoulderWidthInches = (shoulderWidthPixels / (0.8 * canvas.height)) * userHeight
-                      return `Shoulder Width: ${shoulderWidthPixels.toFixed(0)}px = ${shoulderWidthInches.toFixed(1)}"`
-                    }
-                  } else {
-                    // For lower body items, show hip width
-                    if (landmarks[11] && landmarks[12]) {
-                      const hipWidthPixels = Math.abs(landmarks[11].x - landmarks[12].x) * canvas.width
-                      const hipWidthInches = (hipWidthPixels / (0.8 * canvas.height)) * userHeight
-                      return `Hip Width: ${hipWidthPixels.toFixed(0)}px = ${hipWidthInches.toFixed(1)}"`
-                    }
+                  // Use EXACT pose detection measurements - no estimating!
+                  let pixelsPerInch = 0
+                  
+                  // Measure from nose to ankle - this is what the user's height represents
+                  if (landmarks[0] && landmarks[15]) {
+                    const noseY = landmarks[0].y * canvas.height
+                    const ankleY = landmarks[15].y * canvas.height
+                    const personHeightPixels = Math.abs(ankleY - noseY)
+                    
+                    // Add compensation for nose/eyes to top of head (typically 4-5 inches)
+                    const eyesToTopOfHead = 4.5 // inches - distance from nose/eyes to top of head
+                    const adjustedUserHeight = userHeight + eyesToTopOfHead
+                    pixelsPerInch = personHeightPixels / adjustedUserHeight
                   }
                   
-                  return `Height: ${userHeight}" | Scale: ${((0.8 * canvas.height) / userHeight).toFixed(1)}px/inch`
+                  if (pixelsPerInch > 0) {
+                    if (config.focusArea.includes('upper')) {
+                      // For upper body items, show shoulder width
+                      if (landmarks[5] && landmarks[6]) {
+                        const shoulderWidthPixels = Math.abs(landmarks[5].x - landmarks[6].x) * canvas.width
+                        const shoulderWidthInches = shoulderWidthPixels / pixelsPerInch
+                        return `Shoulder Width: ${shoulderWidthPixels.toFixed(0)}px = ${shoulderWidthInches.toFixed(1)}"`
+                      }
+                    } else {
+                      // For lower body items, show hip width
+                      if (landmarks[11] && landmarks[12]) {
+                        const hipWidthPixels = Math.abs(landmarks[11].x - landmarks[12].x) * canvas.width
+                        const hipWidthInches = hipWidthPixels / pixelsPerInch
+                        return `Hip Width: ${hipWidthPixels.toFixed(0)}px = ${hipWidthInches.toFixed(1)}"`
+                      }
+                    }
+                    
+                    return `Height: ${userHeight}" | Scale: ${pixelsPerInch.toFixed(1)}px/inch`
+                  }
+                  
+                  return `Height: ${userHeight}" | Calculating scale...`
                 })()}
               </div>
             </div>
