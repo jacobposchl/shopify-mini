@@ -8,6 +8,7 @@ import { Logger } from '../utils/Logger'
 import { ConfidenceThreshold } from './ConfidenceThreshold'
 import { getClothingInstructions } from '../data/poseRequirements'
 import { BackButton } from './BackButton'
+import { CameraDebugOverlay } from './CameraDebugOverlay'
 
 // Extend Window interface to include our custom property
 declare global {
@@ -281,7 +282,7 @@ const analyzeUserPosition = (
   const allJoints = [...new Set([...topItemJoints, ...bottomItemJoints])] // Union of all joints
   
   const visibleJoints = allJoints.filter(index => 
-    landmarks[index] && landmarks[index].confidence > 0.3
+    landmarks[index] && landmarks[index].confidence > 0.35
   )
   
   const isInFrame = visibleJoints.length >= allJoints.length * 0.8
@@ -842,6 +843,7 @@ export function MeasurementsStepImpl({
   const [debugBufferSize, setDebugBufferSize] = useState(0)
   const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
   const [positionFeedback, setPositionFeedback] = useState<PositionFeedback | null>(null)
+  const [showDebugOverlay, setShowDebugOverlay] = useState(false)
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const {
@@ -1317,7 +1319,7 @@ export function MeasurementsStepImpl({
       const allJoints = [...new Set([...topItemJoints, ...bottomItemJoints])]
     
          // Draw dynamic head box that follows the detected nose position with 3D rotation
-     if (isTopItem && poseResults.landmarks[0] && poseResults.landmarks[0].confidence > 0.3) {
+     if (isTopItem && poseResults.landmarks[0] && poseResults.landmarks[0].confidence > 0.35) {
        // Get nose position and convert to canvas coordinates
        const noseX = canvas.width - (poseResults.landmarks[0].x * scale + offsetX)
        const noseY = poseResults.landmarks[0].y * scale + offsetY
@@ -1325,7 +1327,7 @@ export function MeasurementsStepImpl({
        // Calculate 3D rotation based on ear positions (indices 3 and 4) for head tilt
        let tiltAngle = 0
        if (poseResults.landmarks[3] && poseResults.landmarks[4] && 
-           poseResults.landmarks[3].confidence > 0.3 && poseResults.landmarks[4].confidence > 0.3) {
+           poseResults.landmarks[3].confidence > 0.35 && poseResults.landmarks[4].confidence > 0.35) {
          const leftEarX = poseResults.landmarks[3].x * scale + offsetX
          const leftEarY = poseResults.landmarks[3].y * scale + offsetY
          const rightEarX = poseResults.landmarks[4].x * scale + offsetX
@@ -1340,7 +1342,7 @@ export function MeasurementsStepImpl({
         let headBoxHeight = 80 // Default size - reduced from 160
         
         if (poseResults.landmarks[5] && poseResults.landmarks[6] && 
-            poseResults.landmarks[5].confidence > 0.3 && poseResults.landmarks[6].confidence > 0.3) {
+            poseResults.landmarks[5].confidence > 0.35 && poseResults.landmarks[6].confidence > 0.35) {
           // Get shoulder positions
           const leftShoulderX = poseResults.landmarks[5].x * scale + offsetX
           const rightShoulderX = poseResults.landmarks[6].x * scale + offsetX
@@ -1411,7 +1413,7 @@ export function MeasurementsStepImpl({
     
          // Draw all landmarks but color them based on relevance to the selected clothing type
      poseResults.landmarks.forEach((landmark: any, index: number) => {
-       if (landmark.confidence > 0.3 && allJoints.includes(index)) {
+       if (landmark.confidence > 0.35 && allJoints.includes(index)) {
          const x = canvas.width - (landmark.x * scale + offsetX)
          const y = landmark.y * scale + offsetY
 
@@ -1460,7 +1462,7 @@ export function MeasurementsStepImpl({
 
        // Draw all connections where both landmarks are visible
        if (landmark1 && landmark2 && 
-           landmark1.confidence > 0.3 && landmark2.confidence > 0.3 &&
+           landmark1.confidence > 0.35 && landmark2.confidence > 0.35 &&
            allJoints.includes(index1) && allJoints.includes(index2)) {
          
          const x1 = canvas.width - (landmark1.x * scale + offsetX)
@@ -1645,7 +1647,7 @@ export function MeasurementsStepImpl({
         const landmark1 = poseResults.landmarks[index1]
         const landmark2 = poseResults.landmarks[index2]
 
-        if (landmark1 && landmark2 && landmark1.confidence > 0.3 && landmark2.confidence > 0.3) {
+        if (landmark1 && landmark2 && landmark1.confidence > 0.35 && landmark2.confidence > 0.35) {
           const x1 = canvas.width - (landmark1.x * scale + offsetX)
           const y1 = landmark1.y * scale + offsetY
           const x2 = canvas.width - (landmark2.x * scale + offsetX)
@@ -2051,6 +2053,14 @@ export function MeasurementsStepImpl({
         <div className="absolute top-4 left-4 z-10">
           <BackButton onClick={onCancel} />
         </div>
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            onClick={() => setShowDebugOverlay(true)}
+            className="bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-700"
+          >
+            🐛 Debug
+          </button>
+        </div>
 
         <div className="px-4 pt-16 pb-4 text-center">
           <h1 className="text-xl font-bold text-white">Get Your Measurements</h1>
@@ -2188,9 +2198,42 @@ export function MeasurementsStepImpl({
                 >
                   Agree
                 </button>
+                <button
+                  onClick={() => setShowDebugOverlay(true)}
+                  className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-red-700"
+                >
+                  Debug
+                </button>
               </div>
             </div>
           </div>
+        )}
+
+        {/* Debug Overlay */}
+        {showDebugOverlay && (
+          <CameraDebugOverlay
+            isVisible={showDebugOverlay}
+            onClose={() => setShowDebugOverlay(false)}
+            poseDetectionStatus={{
+              isInitialized: isPoseInitialized,
+              isLoading: isPoseLoading,
+              error: poseError || '',
+              poseResults: poseResults
+            }}
+            cameraStatus={{
+              isActive: !cameraError && videoRef.current?.srcObject !== null,
+              error: cameraError,
+              stream: videoRef.current?.srcObject as MediaStream || null
+            }}
+            videoElement={videoRef.current}
+            poseStability={poseStability}
+            onForceCameraStart={retryCamera}
+            onForcePoseInit={() => {
+              if (videoRef.current) {
+                initializePose(videoRef.current).catch(console.error)
+              }
+            }}
+          />
         )}
 
 

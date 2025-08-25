@@ -39,6 +39,13 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
   const initializationAttemptsRef = useRef(0)
   const initializationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
+  // Add temporal smoothing refs
+  const landmarkHistoryRef = useRef<Array<Array<{ x: number; y: number; confidence: number }>>>([[]])
+  const smoothingWindowSize = 4 // Reduced from 5 for faster response
+  
+  // Performance monitoring ref
+  const lastPerformanceLogRef = useRef<number>(0)
+  
   // Add pose stability tracking refs
   const previousLandmarksRef = useRef<Array<{ x: number; y: number; confidence: number }> | null>(null)
   const lastStabilityUpdateRef = useRef<number>(0)
@@ -46,6 +53,42 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
   const stabilityStartTimeRef = useRef<number>(0)
   const consecutiveStableFramesRef = useRef<number>(0)
 
+  // Temporal smoothing function for more stable landmarks
+  const smoothLandmarks = useCallback((newLandmarks: Array<{ x: number; y: number; confidence: number }>) => {
+    return newLandmarks.map((landmark, idx) => {
+      // Initialize history array for this landmark if it doesn't exist
+      if (!landmarkHistoryRef.current[idx]) {
+        landmarkHistoryRef.current[idx] = []
+      }
+      
+      const history = landmarkHistoryRef.current[idx]
+      history.push(landmark)
+      
+      // Keep only the last N frames
+      if (history.length > smoothingWindowSize) {
+        history.shift()
+      }
+      
+      // Calculate weighted average (more weight on recent frames for MobileNetV2)
+      const weights = [0.5, 0.3, 0.15, 0.05] // More weight on recent frames
+      let weightedX = 0, weightedY = 0, maxConfidence = 0
+      let totalWeight = 0
+      
+      for (let i = 0; i < history.length; i++) {
+        const weight = weights[i] || 0.05
+        weightedX += history[history.length - 1 - i].x * weight
+        weightedY += history[history.length - 1 - i].y * weight
+        maxConfidence = Math.max(maxConfidence, history[history.length - 1 - i].confidence)
+        totalWeight += weight
+      }
+      
+      return {
+        x: weightedX / totalWeight,
+        y: weightedY / totalWeight,
+        confidence: maxConfidence
+      }
+    })
+  }, [])
 
   // Function to get required stable frames based on threshold
   const getRequiredStableFrames = useCallback((threshold: number): number => {
@@ -245,14 +288,14 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
             maxViewportDims: `${maxViewportDims[0]}x${maxViewportDims[1]}`
           })
 
-          // Load PoseNet model with conservative settings for better compatibility
+          // Load PoseNet model with optimized MobileNetV1 configuration for best balance
           console.log('📥 TF.js: Loading PoseNet model...')
           const model = await posenet.load({
-            architecture: 'MobileNetV1',
-            outputStride: 16,
-            inputResolution: { width: 257, height: 257 },
-            multiplier: 0.5, // More conservative for better compatibility
-            quantBytes: 2
+            architecture: 'MobileNetV1',        // Best balance of speed and accuracy
+            outputStride: 8,                    // High precision for measurements
+            inputResolution: { width: 353, height: 353 },  // Balanced resolution
+            multiplier: 0.75,                   // Good model capacity without excessive computation
+            quantBytes: 4                       // Higher precision weights
           })
 
           // Verify model loaded correctly
@@ -266,7 +309,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
           consecutiveErrorsRef.current = 0
           initializationAttemptsRef.current = 0
 
-          console.log('✅ TF.js: Model loaded successfully')
+          console.log('✅ TF.js: MobileNetV1 model loaded successfully')
           
           // Test the model with a simple prediction
           try {
@@ -297,7 +340,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
       const timeoutPromise = new Promise<void>((_, reject) => {
         initializationTimeoutRef.current = setTimeout(() => {
           reject(new Error('Pose detection initialization timed out'))
-        }, 30000) // 30 second timeout
+        }, 40000) // 40 second timeout for MobileNetV2
       })
 
       // Race between initialization and timeout
@@ -403,7 +446,9 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
 
       // Estimate pose using the canvas instead of video element
       const pose = await modelRef.current.estimateSinglePose(canvas, {
-        flipHorizontal: false
+        flipHorizontal: false,
+        minPoseConfidence: 0.3,
+        minPartConfidence: 0.3
       })
 
       // Reset error counter on successful detection
@@ -416,29 +461,36 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
           confidence: keypoint.score
         }))
 
-        // Calculate detection confidence
-        const avgConfidence = landmarks.reduce((sum: number, kp: { confidence: number }) => sum + kp.confidence, 0) / landmarks.length
-        const highConfidenceCount = landmarks.filter((kp: { confidence: number }) => kp.confidence > 0.3).length
-        const isDetected = avgConfidence > 0.2 && highConfidenceCount >= 5
+        // Apply temporal smoothing for more stable measurements
+        const smoothedLandmarks = smoothLandmarks(landmarks)
 
-        // Log detection success periodically
-        if (Math.random() < 0.05) { // 5% of frames
-          console.log('✅ TF.js: Pose detected', {
+        // Calculate detection confidence with balanced thresholds for MobileNetV2
+        const avgConfidence = smoothedLandmarks.reduce((sum: number, kp: { confidence: number }) => sum + kp.confidence, 0) / smoothedLandmarks.length
+        const highConfidenceCount = smoothedLandmarks.filter((kp: { confidence: number }) => kp.confidence > 0.4).length
+        const isDetected = avgConfidence > 0.35 && highConfidenceCount >= 8
+
+        // Performance monitoring for MobileNetV1
+        if (Math.random() < 0.02) { // 2% of frames
+          const now = performance.now()
+          const timeSinceLastLog = now - (lastPerformanceLogRef.current || now)
+          const estimatedFPS = timeSinceLastLog > 0 ? Math.round(1000 / timeSinceLastLog * 50) : 0
+          console.log('📊 MobileNetV1 Performance:', {
             avgConfidence: avgConfidence.toFixed(3),
-            highConfidenceKeypoints: highConfidenceCount,
-            totalKeypoints: landmarks.length,
-            videoDimensions: `${video.videoWidth}x${video.videoHeight}`
+            detectedKeypoints: highConfidenceCount,
+            estimatedFPS,
+            inputResolution: '353x353'
           })
+          lastPerformanceLogRef.current = now
         }
 
         setPoseResults({
-          landmarks,
+          landmarks: smoothedLandmarks,
           isDetected,
           confidence: avgConfidence
         })
 
         // Update pose stability
-        updatePoseStability(landmarks, selectedStyleIdRef.current || 'shirts', stabilityThreshold, positionFeedback)
+        updatePoseStability(smoothedLandmarks, selectedStyleIdRef.current || 'shirts', stabilityThreshold, positionFeedback)
 
       } else {
         // No pose found, but don't log this as an error
