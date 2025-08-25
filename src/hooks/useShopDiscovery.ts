@@ -18,23 +18,19 @@ export function useShopDiscovery() {
   const { 
     shops: followedShops, 
     loading: followedLoading, 
-    error: followedError,
-    fetchMore: fetchMoreFollowed,
-    hasNextPage: hasMoreFollowed
+    error: followedError
   } = useFollowedShops({ first: 5 })
 
   const { 
     shops: recentShops, 
     loading: recentLoading, 
-    error: recentError,
-    fetchMore: fetchMoreRecent,
-    hasNextPage: hasMoreRecent
+    error: recentError
   } = useRecentShops({ first: 3 })
 
   const { getItem, setItem } = useAsyncStorage()
   
   // Fashion validation hook
-  const { quickFilterShops, validateShops, isValidating } = useFashionShopValidator()
+  const { quickFilterShops, isValidating } = useFashionShopValidator()
   
   // Local state for user preferences
   const [localFollowedShops, setLocalFollowedShops] = useState<string[]>([])

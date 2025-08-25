@@ -21,16 +21,48 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     shops: discoveredShops,
     groupedShops,
     loading,
-    hasError: discoveryError,
     followShop,
     unfollowShop,
     recordShopVisit,
     userPreferences,
     fetchMoreRecommended,
     recommendedLoading,
-    hasMoreRecommended,
-    allShopsBeforeFilter
+    hasMoreRecommended
   } = useShopDiscovery()
+
+  // Search for popular products to use as shop images when logos are missing
+  const { products: popularProducts, loading: popularProductsLoading } = useProductSearch({
+    query: 'fashion clothing apparel',
+    first: 100,
+    includeSensitive: false
+  })
+
+  // Enhanced shops with fallback product images
+  const enhancedGroupedShops = useMemo(() => {
+    if (!popularProducts || popularProductsLoading) return groupedShops
+    
+    const enhanced = { ...groupedShops }
+    
+    // Create a map of shop ID to product images
+    const shopProductImages = new Map<string, string>()
+    popularProducts.forEach((product: any) => {
+      const shopId = product.shop?.id
+      const imageUrl = product.featuredImage?.url
+      if (shopId && imageUrl && !shopProductImages.has(shopId)) {
+        shopProductImages.set(shopId, imageUrl)
+      }
+    })
+    
+    // Enhance each shop category
+    Object.keys(enhanced).forEach(priority => {
+      enhanced[priority as keyof typeof enhanced] = enhanced[priority as keyof typeof enhanced].map(shop => ({
+        ...shop,
+        logo: shop.logo || shopProductImages.get(shop.id) || ''
+      }))
+    })
+    
+    return enhanced
+  }, [groupedShops, popularProducts, popularProductsLoading])
 
   // Error boundary - if anything crashes, show fallback
   if (hasError) {
@@ -61,11 +93,12 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     } catch (error) {
       console.error('Error in debounce effect:', error)
       setHasError(true)
+      return () => {} // Return cleanup function even in error case
     }
   }, [searchQuery])
 
   // User-initiated search using product search to find shops
-  const { products: searchProducts, loading: searchLoading, error: searchError } = useProductSearch({
+  const { products: searchProducts, loading: searchLoading } = useProductSearch({
     query: debouncedQuery ? `${debouncedQuery} fashion clothing apparel` : '',
     first: 50,
     includeSensitive: false
@@ -78,7 +111,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
       
       const shopMap = new Map<string, DiscoveredShop>()
       
-      searchProducts.forEach((product: any, index: number) => {
+      searchProducts.forEach((product: any) => {
         try {
           const shopId = product.shop?.id
           const shopName = product.shop?.name
@@ -111,22 +144,19 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
   const displayShops = useMemo(() => {
     if (debouncedQuery.trim()) {
       // When searching, show search results first, then discovered shops
-      const merged = { ...groupedShops }
+      const merged = { ...enhancedGroupedShops }
       
       // Add search results to DISCOVERY section, but avoid duplicates
-      const existingDiscovery = groupedShops[ShopPriority.DISCOVERY] || []
-      const searchShopsUnique = searchShops.filter(searchShop => 
-        !existingDiscovery.some(existing => existing.id === searchShop.id)
-      )
+      const existingDiscovery = enhancedGroupedShops[ShopPriority.DISCOVERY] || []
       
       merged[ShopPriority.DISCOVERY] = [...searchShops, ...existingDiscovery]
       
       return merged
     } else {
-      // When not searching, show discovered shops only
-      return groupedShops
+      // When not searching, show enhanced discovered shops only
+      return enhancedGroupedShops
     }
-  }, [debouncedQuery, searchShops, groupedShops]) as Record<ShopPriority, DiscoveredShop[]>
+  }, [debouncedQuery, searchShops, enhancedGroupedShops]) as Record<ShopPriority, DiscoveredShop[]>
 
   const handleSelect = async (shop: DiscoveredShop) => {
     // Record the shop visit
@@ -258,7 +288,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
   }
 
   // Loading state
-  if (loading && discoveredShops.length === 0) {
+  if ((loading || popularProductsLoading) && discoveredShops.length === 0) {
     return (
       <div className="min-h-screen bg-[#550cff] flex flex-col">
         <header className="relative bg-transparent">
