@@ -729,14 +729,9 @@ export function MeasurementsStepImpl({
   }
 
   // --- helpers to compute distances/measurements ---
-  const calculateDistance = (landmark1: any, landmark2: any, scale: number) => {
-    const pixelDistance = Math.sqrt(
-      Math.pow((landmark2.x - landmark1.x) * scale, 2) + Math.pow((landmark2.y - landmark1.y) * scale, 2),
-    )
-    
+  const calculateDistance = (landmark1: any, landmark2: any) => {
     // Use pose detection-based scaling for accurate measurements
     if (userHeight && canvasRef.current && poseResults?.isDetected) {
-      // Use the EXACT pose detection measurements - no estimating!
       // Measure from nose to ankle for full height using canvas coordinates
       if (poseResults.landmarks[0] && poseResults.landmarks[15]) {
         const noseY = poseResults.landmarks[0].y * canvasRef.current.height
@@ -748,7 +743,7 @@ export function MeasurementsStepImpl({
         const adjustedUserHeight = userHeight + eyesToTopOfHead
         const pixelsPerInch = personHeightPixels / adjustedUserHeight
         
-        // Convert pixel distance to inches using canvas coordinates
+        // Convert pixel distance to inches using canvas coordinates - FIXED METHOD
         const pixelDistanceInCanvas = Math.sqrt(
           Math.pow((landmark2.x - landmark1.x) * canvasRef.current.width, 2) + 
           Math.pow((landmark2.y - landmark1.y) * canvasRef.current.height, 2)
@@ -760,11 +755,15 @@ export function MeasurementsStepImpl({
     
     // Fallback to old calibration if no height or pose detection available
     const calibrationFactor = 22.5 / 2.0 // rough, demo-only
+    const pixelDistance = Math.sqrt(
+      Math.pow((landmark2.x - landmark1.x) * (canvasRef.current?.width || 640), 2) + 
+      Math.pow((landmark2.y - landmark1.y) * (canvasRef.current?.height || 480), 2)
+    )
     const distanceInInches = (pixelDistance / 50) * calibrationFactor
     return distanceInInches.toFixed(1)
   }
 
-  const calculateRealMeasurements = (landmarks: any[], scale: number, clothingType: string) => {
+  const calculateRealMeasurements = (landmarks: any[], clothingType: string) => {
     const measurements: Measurements = {
       chest: 0,
       waist: 0,
@@ -777,7 +776,7 @@ export function MeasurementsStepImpl({
     }
 
     if (landmarks[5] && landmarks[6]) {
-      measurements.shoulders = parseFloat(calculateDistance(landmarks[5], landmarks[6], scale))
+      measurements.shoulders = parseFloat(calculateDistance(landmarks[5], landmarks[6]))
     }
 
     switch (clothingType) {
@@ -785,7 +784,7 @@ export function MeasurementsStepImpl({
       case 'jackets':
         measurements.chest = measurements.shoulders * 2.3
         if (landmarks[5] && landmarks[7]) {
-          measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7], scale))
+          measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7]))
         }
         measurements.waist = measurements.chest * 0.85
         break
@@ -793,13 +792,13 @@ export function MeasurementsStepImpl({
       case 'pants':
       case 'shorts':
         if (landmarks[11] && landmarks[12]) {
-          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12], scale))
+          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12]))
         }
         measurements.waist = measurements.hips * 2.2
         if (clothingType === 'pants' && landmarks[11] && landmarks[15]) {
-          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15], scale))
+          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15]))
         } else if (clothingType === 'shorts' && landmarks[11] && landmarks[13]) {
-          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[13], scale))
+          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[13]))
         }
         break
 
@@ -807,13 +806,13 @@ export function MeasurementsStepImpl({
         measurements.chest = measurements.shoulders * 2.3
         measurements.waist = measurements.chest * 0.85
         if (landmarks[11] && landmarks[12]) {
-          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12], scale))
+          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12]))
         }
         if (landmarks[5] && landmarks[7]) {
-          measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7], scale))
+          measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7]))
         }
         if (landmarks[11] && landmarks[15]) {
-          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15], scale))
+          measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15]))
         }
         break
 
@@ -889,7 +888,6 @@ export function MeasurementsStepImpl({
       try {
         const current = calculateRealMeasurements(
           poseResults.landmarks,
-          parseFloat(canvasRef.current?.dataset.videoScale || '1'),
           selectedStyleId,
         )
         setMeasurementBuffer((prev) => {

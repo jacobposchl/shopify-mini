@@ -340,7 +340,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
       const timeoutPromise = new Promise<void>((_, reject) => {
         initializationTimeoutRef.current = setTimeout(() => {
           reject(new Error('Pose detection initialization timed out'))
-        }, 40000) // 40 second timeout for MobileNetV2
+        }, 40000) // 40 second timeout for MobileNetV1
       })
 
       // Race between initialization and timeout
@@ -464,7 +464,7 @@ export const usePoseDetectionTF = (stabilityThreshold: number = 200) => {
         // Apply temporal smoothing for more stable measurements
         const smoothedLandmarks = smoothLandmarks(landmarks)
 
-        // Calculate detection confidence with balanced thresholds for MobileNetV2
+        // Calculate detection confidence with balanced thresholds for MobileNetV1
         const avgConfidence = smoothedLandmarks.reduce((sum: number, kp: { confidence: number }) => sum + kp.confidence, 0) / smoothedLandmarks.length
         const highConfidenceCount = smoothedLandmarks.filter((kp: { confidence: number }) => kp.confidence > 0.4).length
         const isDetected = avgConfidence > 0.35 && highConfidenceCount >= 8
