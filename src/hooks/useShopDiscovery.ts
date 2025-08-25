@@ -67,7 +67,7 @@ export function useShopDiscovery() {
     return {
       id: shop.id,
       name: shop.name,
-      logo: shop.logo?.url || shop.logo || '', // Use official shop logo
+      logo: shop.logoImage?.url || shop.logo?.url || shop.logo || '', // Use official shop logo from logoImage.url
       description: shop.description || reason,
       priority,
       reason,
