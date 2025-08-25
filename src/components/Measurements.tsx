@@ -740,7 +740,7 @@ export function MeasurementsStepImpl({
         
         // Add compensation for nose/eyes to top of head (typically 4-5 inches)
         const eyesToTopOfHead = 4.5 // inches - distance from nose/eyes to top of head
-        const noseToAnkleHeight = userHeight - eyesToTopOfHead 
+        const noseToAnkleHeight = userHeight + eyesToTopOfHead 
       const pixelsPerInch = personHeightPixels / noseToAnkleHeight
         
         // Convert pixel distance - landmarks already in pixels
@@ -782,19 +782,34 @@ export function MeasurementsStepImpl({
     switch (clothingType) {
       case 'shirts':
       case 'jackets':
-        measurements.chest = measurements.shoulders * 2.3
+        // Measure chest using elbow width (more accurate than shoulder multiplier)
+        if (landmarks[7] && landmarks[8]) {
+          const elbowWidth = parseFloat(calculateDistance(landmarks[7], landmarks[8]))
+          measurements.chest = parseFloat((elbowWidth * 3.14 * 0.9).toFixed(1)) // Convert to circumference with fit factor
+        } else {
+          measurements.chest = measurements.shoulders * 2.3 // Fallback to old method
+        }
+        
         if (landmarks[5] && landmarks[7]) {
           measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7]))
         }
-        measurements.waist = measurements.chest * 0.85
+        
+        // Measure hips first, then calculate waist from hips (more accurate)
+        if (landmarks[11] && landmarks[12]) {
+          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12]))
+          measurements.waist = measurements.hips * 0.85
+        } else {
+          measurements.waist = measurements.chest * 0.85 // Fallback
+        }
         break
 
       case 'pants':
       case 'shorts':
         if (landmarks[11] && landmarks[12]) {
           measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12]))
+          measurements.waist = measurements.hips * 0.85 // More accurate than 2.2 multiplier
         }
-        measurements.waist = measurements.hips * 2.2
+        
         if (clothingType === 'pants' && landmarks[11] && landmarks[15]) {
           measurements.inseam = parseFloat(calculateDistance(landmarks[11], landmarks[15]))
         } else if (clothingType === 'shorts' && landmarks[11] && landmarks[13]) {
@@ -803,11 +818,22 @@ export function MeasurementsStepImpl({
         break
 
       case 'activewear':
-        measurements.chest = measurements.shoulders * 2.3
-        measurements.waist = measurements.chest * 0.85
+        // Measure chest using elbow width
+        if (landmarks[7] && landmarks[8]) {
+          const elbowWidth = parseFloat(calculateDistance(landmarks[7], landmarks[8]))
+          measurements.chest = parseFloat((elbowWidth * 3.14 * 0.9).toFixed(1))
+        } else {
+          measurements.chest = measurements.shoulders * 2.3 // Fallback
+        }
+        
+        // Measure hips first, then calculate waist from hips
         if (landmarks[11] && landmarks[12]) {
           measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12]))
+          measurements.waist = measurements.hips * 0.85
+        } else {
+          measurements.waist = measurements.chest * 0.85 // Fallback
         }
+        
         if (landmarks[5] && landmarks[7]) {
           measurements.armLength = parseFloat(calculateDistance(landmarks[5], landmarks[7]))
         }
@@ -817,9 +843,22 @@ export function MeasurementsStepImpl({
         break
 
       default:
-        measurements.chest = measurements.shoulders * 2.3
-        measurements.waist = measurements.chest * 0.85
-        measurements.hips = measurements.shoulders * 2.1
+        // Measure chest using elbow width if available
+        if (landmarks[7] && landmarks[8]) {
+          const elbowWidth = parseFloat(calculateDistance(landmarks[7], landmarks[8]))
+          measurements.chest = parseFloat((elbowWidth * 3.14 * 0.9).toFixed(1))
+        } else {
+          measurements.chest = measurements.shoulders * 2.3 // Fallback
+        }
+        
+        // Measure hips if available, otherwise estimate from shoulders
+        if (landmarks[11] && landmarks[12]) {
+          measurements.hips = parseFloat(calculateDistance(landmarks[11], landmarks[12]))
+          measurements.waist = measurements.hips * 0.85
+        } else {
+          measurements.waist = measurements.chest * 0.85
+          measurements.hips = measurements.shoulders * 2.1 // Fallback
+        }
     }
 
     return measurements
