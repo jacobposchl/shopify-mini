@@ -290,11 +290,47 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
 
       if (selectedGender !== 'all') {
         const productName = product.name.toLowerCase()
-        if (selectedGender === 'men' && (productName.includes('women') || productName.includes('female'))) {
-          return false
-        }
-        if (selectedGender === 'women' && (productName.includes('men') || productName.includes('male'))) {
-          return false
+        const productType = (product.shopifyProduct as any)?.productType?.toLowerCase() || ''
+        const tags = ((product.shopifyProduct as any)?.tags || []).map((tag: string) => tag.toLowerCase())
+        const vendor = (product.shopifyProduct as any)?.vendor?.toLowerCase() || ''
+        
+        // More comprehensive gender detection
+        const isMenProduct = 
+          productName.includes('men') || 
+          productName.includes('male') || 
+          productName.includes('guy') ||
+          productType.includes('men') || 
+          productType.includes('male') ||
+          tags.some(tag => tag.includes('men') || tag.includes('male') || tag.includes('guy')) ||
+          vendor.includes('men') || 
+          vendor.includes('male')
+        
+        const isWomenProduct = 
+          productName.includes('women') || 
+          productName.includes('female') || 
+          productName.includes('girl') ||
+          productType.includes('women') || 
+          productType.includes('female') ||
+          tags.some(tag => tag.includes('women') || tag.includes('female') || tag.includes('girl')) ||
+          vendor.includes('women') || 
+          vendor.includes('female')
+        
+        const isUnisexProduct = 
+          productName.includes('unisex') || 
+          productName.includes('gender neutral') ||
+          productType.includes('unisex') ||
+          tags.some(tag => tag.includes('unisex') || tag.includes('gender neutral'))
+        
+        // Apply gender filtering
+        if (selectedGender === 'men') {
+          if (isWomenProduct) return false
+          // For men's filter, prefer men's products but allow unisex
+        } else if (selectedGender === 'women') {
+          if (isMenProduct) return false
+          // For women's filter, prefer women's products but allow unisex
+        } else if (selectedGender === 'unisex') {
+          // For unisex filter, only show explicitly unisex products
+          if (!isUnisexProduct) return false
         }
       }
 
@@ -487,6 +523,8 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
           <p className="text-sm text-white/80 text-center">
             {filteredProducts.length} item{filteredProducts.length !== 1 ? 's' : ''} available
           </p>
+          
+
         </div>
 
         {/* Grid */}
