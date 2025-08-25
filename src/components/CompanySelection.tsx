@@ -232,22 +232,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
             </div>
           </div>
           
-          {/* Follow Button */}
-          <div className="absolute top-3 left-3 z-20">
-            <button
-              onClick={(e) => handleFollowToggle(shop, e)}
-              className={`flex items-center justify-center w-8 h-8 rounded-full shadow-lg ring-2 ring-white/80 transition-all duration-300 ${
-                isFollowed 
-                  ? 'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600' 
-                  : 'bg-white/90 hover:bg-white backdrop-blur-sm'
-              }`}
-              aria-label={isFollowed ? `Unfollow ${shop.name}` : `Follow ${shop.name}`}
-            >
-              <span className="text-sm">
-                {isFollowed ? '❤️' : '🤍'}
-              </span>
-            </button>
-          </div>
+
         </div>
       </div>
     )
