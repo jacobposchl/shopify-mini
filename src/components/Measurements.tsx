@@ -732,10 +732,10 @@ export function MeasurementsStepImpl({
   const calculateDistance = (landmark1: any, landmark2: any) => {
     // Use pose detection-based scaling for accurate measurements
     if (userHeight && canvasRef.current && poseResults?.isDetected) {
-      // Measure from nose to ankle for full height using canvas coordinates
+      // Measure from nose to ankle - landmarks are ALREADY in pixels
       if (poseResults.landmarks[0] && poseResults.landmarks[15]) {
-        const noseY = poseResults.landmarks[0].y * canvasRef.current.height
-        const ankleY = poseResults.landmarks[15].y * canvasRef.current.height
+        const noseY = poseResults.landmarks[0].y  // Remove * canvasRef.current.height
+        const ankleY = poseResults.landmarks[15].y // Remove * canvasRef.current.height
         const personHeightPixels = Math.abs(ankleY - noseY)
         
         // Add compensation for nose/eyes to top of head (typically 4-5 inches)
@@ -743,10 +743,10 @@ export function MeasurementsStepImpl({
         const adjustedUserHeight = userHeight + eyesToTopOfHead
         const pixelsPerInch = personHeightPixels / adjustedUserHeight
         
-        // Convert pixel distance to inches using canvas coordinates - FIXED METHOD
+        // Convert pixel distance - landmarks already in pixels
         const pixelDistanceInCanvas = Math.sqrt(
-          Math.pow((landmark2.x - landmark1.x) * canvasRef.current.width, 2) + 
-          Math.pow((landmark2.y - landmark1.y) * canvasRef.current.height, 2)
+          Math.pow((landmark2.x - landmark1.x), 2) +  // Remove * width
+          Math.pow((landmark2.y - landmark1.y), 2)   // Remove * height
         )
         const distanceInInches = pixelDistanceInCanvas / pixelsPerInch
         return distanceInInches.toFixed(1)
@@ -756,8 +756,8 @@ export function MeasurementsStepImpl({
     // Fallback to old calibration if no height or pose detection available
     const calibrationFactor = 22.5 / 2.0 // rough, demo-only
     const pixelDistance = Math.sqrt(
-      Math.pow((landmark2.x - landmark1.x) * (canvasRef.current?.width || 640), 2) + 
-      Math.pow((landmark2.y - landmark1.y) * (canvasRef.current?.height || 480), 2)
+      Math.pow((landmark2.x - landmark1.x), 2) +  // Remove * width
+      Math.pow((landmark2.y - landmark1.y), 2)   // Remove * height
     )
     const distanceInInches = (pixelDistance / 50) * calibrationFactor
     return distanceInInches.toFixed(1)
@@ -2104,8 +2104,8 @@ export function MeasurementsStepImpl({
                   let adjustedUserHeight = 0
                   
                   if (landmarks[0] && landmarks[15]) {
-                    const noseY = landmarks[0].y * canvas.height
-                    const ankleY = landmarks[15].y * canvas.height
+                    const noseY = landmarks[0].y  // Landmarks already in pixels
+                    const ankleY = landmarks[15].y // Landmarks already in pixels
                     personHeightPixels = Math.abs(ankleY - noseY)
                     
                     // Add compensation for nose/eyes to top of head (typically 4-5 inches)
@@ -2137,10 +2137,10 @@ export function MeasurementsStepImpl({
                           {landmarks[5] && landmarks[6] ? (
                             <>
                               <div className="mb-1">
-                                <span className="text-gray-300">Pixel Distance:</span> {Math.abs((landmarks[5].x - landmarks[6].x) * canvas.width).toFixed(1)}px
+                                <span className="text-gray-300">Pixel Distance:</span> {Math.abs(landmarks[5].x - landmarks[6].x).toFixed(1)}px
                               </div>
                               <div className="mb-1">
-                                <span className="text-gray-300">Converted to Inches:</span> {(Math.abs((landmarks[5].x - landmarks[6].x) * canvas.width) / pixelsPerInch).toFixed(2)} inches
+                                <span className="text-gray-300">Converted to Inches:</span> {(Math.abs(landmarks[5].x - landmarks[6].x) / pixelsPerInch).toFixed(2)} inches
                               </div>
                             </>
                           ) : (
@@ -2162,113 +2162,7 @@ export function MeasurementsStepImpl({
             </div>
           )}
 
-          {/* Raw Debug Data - Left Side */}
-          {!isDemoMode && !measurements && !isProcessing && selectedStyleId && poseResults?.isDetected && userHeight && canvasRef.current && (
-            <div className="absolute top-20 left-4 px-4 py-3 rounded-lg font-medium text-center max-w-sm z-40 bg-red-900 bg-opacity-90 text-white">
-              <div className="text-sm font-mono">
-                {(() => {
-                  const landmarks = poseResults.landmarks
-                  const canvas = canvasRef.current!
-                  
-                  if (landmarks[0] && landmarks[15]) {
-                    // Raw coordinate debugging
-                    const rawNoseY = landmarks[0].y
-                    const rawAnkleY = landmarks[15].y
-                    const rawDifference = Math.abs(rawAnkleY - rawNoseY)
-                    
-                    // Canvas dimensions
-                    const canvasHeight = canvas.height
-                    const canvasWidth = canvas.width
-                    
-                    // Test calculations
-                    const noseY = rawNoseY * canvasHeight
-                    const ankleY = rawAnkleY * canvasHeight
-                    const personHeightPixels = Math.abs(ankleY - noseY)
-                    
-                    // Log to console for debugging
-                    console.log('🔍 Raw Debug Data:', {
-                      'Raw nose Y coordinate': rawNoseY,
-                      'Raw ankle Y coordinate': rawAnkleY,
-                      'Canvas height': canvasHeight,
-                      'Canvas width': canvasWidth,
-                      'noseY calculated': noseY,
-                      'ankleY calculated': ankleY,
-                      'Raw difference (normalized)': rawDifference,
-                      'Person height (pixels)': personHeightPixels
-                    })
-                    
-                    // Test with raw normalized coordinates
-                    console.log('Raw person height (normalized):', rawDifference)
-                    
-                    return (
-                      <>
-                        <div className="text-xs text-red-200 mb-2 font-bold">RAW DEBUG DATA</div>
-                        
-                        {/* Raw Coordinates */}
-                        <div className="mb-3 text-left">
-                          <div className="text-xs text-red-200 mb-1 font-bold">RAW COORDINATES</div>
-                          <div className="mb-1">
-                            <span className="text-red-200">Nose Y:</span> {rawNoseY.toFixed(4)}
-                          </div>
-                          <div className="mb-1">
-                            <span className="text-red-200">Ankle Y:</span> {rawAnkleY.toFixed(4)}
-                          </div>
-                          <div className="mb-1">
-                            <span className="text-red-200">Raw Diff:</span> {rawDifference.toFixed(4)}
-                          </div>
-                        </div>
-                        
-                        {/* Canvas Info */}
-                        <div className="mb-3 text-left">
-                          <div className="text-xs text-red-200 mb-1 font-bold">CANVAS INFO</div>
-                          <div className="mb-1">
-                            <span className="text-red-200">Width:</span> {canvasWidth}px
-                          </div>
-                          <div className="mb-1">
-                            <span className="text-red-200">Height:</span> {canvasHeight}px
-                          </div>
-                        </div>
-                        
-                        {/* Calculated Values */}
-                        <div className="mb-3 text-left">
-                          <div className="text-xs text-red-200 mb-1 font-bold">CALCULATED</div>
-                          <div className="mb-1">
-                            <span className="text-red-200">Nose Y (px):</span> {noseY.toFixed(1)}px
-                          </div>
-                          <div className="mb-1">
-                            <span className="text-red-200">Ankle Y (px):</span> {ankleY.toFixed(1)}px
-                          </div>
-                          <div className="mb-1">
-                            <span className="text-red-200">Height (px):</span> {personHeightPixels.toFixed(1)}px
-                          </div>
-                        </div>
-                        
-                        {/* Analysis */}
-                        <div className="text-left">
-                          <div className="text-xs text-red-200 mb-1 font-bold">ANALYSIS</div>
-                          <div className="mb-1">
-                            <span className="text-red-200">Expected Raw:</span> 0.4-0.8
-                          </div>
-                          <div className="mb-1">
-                            <span className="text-red-200">Expected Pixels:</span> 200-800px
-                          </div>
-                          <div className={`text-xs ${rawDifference >= 0.4 && rawDifference <= 0.8 ? 'text-green-300' : 'text-red-300'}`}>
-                            Raw Range: {rawDifference >= 0.4 && rawDifference <= 0.8 ? '✅ Normal' : '❌ Abnormal'}
-                          </div>
-                        </div>
-                      </>
-                    )
-                  }
-                  
-                  return (
-                    <div className="text-center">
-                      <div className="text-red-200">No landmarks</div>
-                    </div>
-                  )
-                })()}
-              </div>
-            </div>
-          )}
+
          
          
 
