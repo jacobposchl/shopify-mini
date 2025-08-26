@@ -115,9 +115,9 @@ export function App() {
             onCancel={handleBack}
             selectedItemName={flowState.recommendations?.[0]?.item.name}
             selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
-            selectedStyleName={flowState.recommendations?.[0]?.item.style}
-            selectedSubStyleName={flowState.recommendations?.[0]?.item.subStyle}
-            selectedStyleId={flowState.recommendations?.[0]?.item.styleId}
+            selectedStyleName={flowState.userPreferences.selectedCompany?.name}
+            selectedSubStyleName={flowState.userPreferences.selectedCompany?.name}
+            selectedStyleId={flowState.userPreferences.selectedCompany?.id}
             userHeight={flowState.userPreferences.userHeight}
           />
         )
