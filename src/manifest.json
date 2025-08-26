@@ -1,7 +1,8 @@
 {
-  "name": "y\rmy-mini",
-  "permissions": [],
+  "name": "perfect-size",
+  "permissions": ["CAMERA"],
+  "description": "Never guess your size again",
   "privacy_policy_url": "https://example.com/privacy",
   "terms_url": "https://example.com/terms",
-  "handle": "y-my-mini"
+  "handle": "perfect-size"
 }

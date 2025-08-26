@@ -1,8 +1,8 @@
 {
-  "name": "y-my-mini",
+  "name": "perfect-size",
   "private": true,
   "version": "0.0.1",
-  "description": "A Shop Mini with WebView and Vite",
+  "description": "Never guess your size again",
   "main": "index.tsx",
   "scripts": {
     "start": "shop-minis dev"
