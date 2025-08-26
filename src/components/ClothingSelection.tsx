@@ -372,7 +372,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="max-w-md mx-auto">
-          <BackButton onClick={handleBack} />
+          <BackButton onClick={handleBack} variant="minimal" iconSize={22} className="w-12 h-12" />
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Finding perfect items for you...</p>
@@ -386,7 +386,7 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="max-w-md mx-auto">
-          <BackButton onClick={handleBack} />
+          <BackButton onClick={handleBack} variant="minimal" iconSize={22} className="w-12 h-12" />
           <div className="text-center py-8">
             <div className="text-red-500 text-6xl mb-4">⚠️</div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Oops! Something went wrong</h2>
@@ -425,11 +425,10 @@ export function ClothingSelection({ onBack, onItemSelect, selectedCompany }: Clo
   return (
     <div className="min-h-screen bg-[#550cff]">
       <div className="max-w-md mx-auto p-4">
-        <BackButton onClick={handleBack} />
+        <BackButton onClick={handleBack} variant="minimal" iconSize={22} className="w-12 h-12" />
 
         {/* Header */}
-        <div className="text-center mb-6 mt-8">
-          {/* ↑ Bigger to match "Select Shop" */}
+        <div className="text-center mb-6 mt-2">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-2 tracking-tight">
             Select Item
           </h1>
