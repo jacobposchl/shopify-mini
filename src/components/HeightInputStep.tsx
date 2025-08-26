@@ -37,11 +37,13 @@ export function HeightInputStep({
       {/* Header - matches style of other pages */}
       <header className="relative bg-transparent">
         <div className="absolute top-4 left-4 z-10">
-          <BackButton onClick={onBack} />
+          <BackButton onClick={onBack} variant="minimal" iconSize={22} className="w-12 h-12" />
         </div>
 
-        <div className="px-4 pt-16 pb-4 text-center">
-          <h1 className="text-xl font-bold text-white">Enter Your Height</h1>
+        <div className="px-4 pt-12 pb-4 text-center">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 tracking-tight">
+            Enter Your Height
+          </h1>
           <p className="text-sm text-white/80">
             We'll use this to get accurate measurements
           </p>
