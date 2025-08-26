@@ -41,7 +41,19 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
   const enhancedGroupedShops = useMemo(() => {
     if (!popularProducts || popularProductsLoading) return groupedShops
     
-    const enhanced = { ...groupedShops }
+    const enhanced: Record<string, any[]> = { ...groupedShops }
+    
+    // Ensure every priority exists so sections (like "For You") render even when empty
+    const allPriorities = [
+      ShopPriority.RECOMMENDED,
+      ShopPriority.FOLLOWED,
+      ShopPriority.RECENT,
+      ShopPriority.POPULAR,
+      ShopPriority.DISCOVERY,
+    ]
+    allPriorities.forEach((p) => {
+      if (!enhanced[p]) enhanced[p] = []
+    })
     
     // Create a map of shop ID to product images
     const shopProductImages = new Map<string, string>()
@@ -54,8 +66,8 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     })
     
     // Enhance each shop category
-    Object.keys(enhanced).forEach(priority => {
-      enhanced[priority as keyof typeof enhanced] = enhanced[priority as keyof typeof enhanced].map(shop => ({
+    allPriorities.forEach((priority) => {
+      enhanced[priority] = (enhanced[priority] || []).map((shop) => ({
         ...shop,
         logo: shop.logo || shopProductImages.get(shop.id) || ''
       }))
@@ -197,42 +209,36 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
   const renderCard = (shop: DiscoveredShop) => {
     const isFollowed = userPreferences.followedShops.includes(shop.id)
     
+    // Tile-like card (matches ClothingSelection visual style):
     return (
       <div key={shop.id} className="relative">
-        <div className="relative w-full">
-          <div onClick={() => handleSelect(shop)} className="cursor-pointer w-full hover:scale-105 active:scale-95 transition-all duration-300 ease-out">
-            {/* Custom Shop Card - Guaranteed to show images */}
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border-0 max-w-sm">
-              {/* Shop Image */}
-              <div className="relative w-full aspect-[2/1] bg-gradient-to-br from-gray-50 to-gray-100">
-                {shop.logo ? (
-                  <img
-                    src={shop.logo}
-                    alt={`${shop.name} logo`}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-10 h-10 mx-auto mb-1 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                        <span className="text-lg text-white font-bold">{shop.name.charAt(0).toUpperCase()}</span>
-                      </div>
-                      <p className="text-gray-600 text-xs font-medium">{shop.name}</p>
-                    </div>
+        <div
+          onClick={() => handleSelect(shop)}
+          className="w-full cursor-pointer rounded-lg p-2 border border-white bg-white/5 hover:bg-white/10 transition-all duration-200 hover:scale-105 active:scale-95"
+        >
+          <div className="aspect-square mb-2 rounded-md overflow-hidden bg-gradient-to-br from-gray-50/50 to-gray-100/30 flex items-center justify-center">
+            {shop.logo ? (
+              <img
+                src={shop.logo}
+                alt={`${shop.name} logo`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-10 h-10 mx-auto mb-1 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow">
+                    <span className="text-lg text-white font-bold">{shop.name.charAt(0).toUpperCase()}</span>
                   </div>
-                )}
+                </div>
               </div>
-              
-              {/* Shop Info */}
-              <div className="p-3">
-                <h3 className="font-semibold text-gray-900 text-base mb-1">{shop.name}</h3>
-                <p className="text-gray-600 text-xs">{shop.reason}</p>
-              </div>
-            </div>
+            )}
           </div>
-          
 
+          <div className="space-y-1">
+            <h3 className="font-semibold text-white text-sm line-clamp-2">{shop.name}</h3>
+            <p className="text-white/70 text-xs">{shop.reason}</p>
+          </div>
         </div>
       </div>
     )
@@ -244,13 +250,13 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     }
     
     return (
-      <section key={priority} className="mb-8">
-        <div className="sticky top-0 z-10 bg-[#550cff] px-4 py-3 border-b border-white/10">
+      <section key={priority} className="mb-4">
+        <div className="sticky top-0 z-10 bg-[#550cff] px-4 py-2 border-b border-white/10">
           <h2 className="text-xl font-bold text-white">{getSectionTitle(priority)}</h2>
           <p className="text-sm text-white/70">{shops.length} shop{shops.length !== 1 ? 's' : ''}</p>
         </div>
         
-        <div className="px-4 pt-4">
+        <div className="px-4 pt-2">
           {shops.length === 0 ? (
             <div className="py-8 text-center text-white/80">
               <p className="text-lg font-medium">No shops recommended for you</p>
@@ -258,7 +264,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
             </div>
           ) : (
             <>
-              <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
                 {shops.map(renderCard)}
               </div>
 
@@ -339,7 +345,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
         </div>
         
         {/* Search Bar */}
-        <div className="px-4 mb-6">
+        <div className="px-4 mb-3">
           <div className="relative max-w-md mx-auto">
             <input
               type="text"
@@ -377,16 +383,16 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
 
       {/* Scrollable content with sections */}
       <div className="flex-1 overflow-y-auto">
-        <div className="py-4">
+        <div className="py-2">
           {/* Show search results if searching */}
           {searchQuery.trim() && searchShops.length > 0 && (
-            <section className="mb-8">
-              <div className="sticky top-0 z-10 bg-[#550cff] px-4 py-3 border-b border-white/10">
+            <section className="mb-4">
+              <div className="sticky top-0 z-10 bg-[#550cff] px-4 py-2 border-b border-white/10">
                 <h2 className="text-xl font-bold text-white">Shops Found for "{searchQuery}"</h2>
                 <p className="text-sm text-white/70">{searchShops.length} shop{searchShops.length !== 1 ? 's' : ''} found</p>
               </div>
-              <div className="px-4 pt-4">
-                <div className="space-y-4">
+              <div className="px-4 pt-2">
+                <div className="grid grid-cols-2 gap-3">
                   {searchShops.map(renderCard)}
                 </div>
               </div>
