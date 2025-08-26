@@ -238,8 +238,8 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     )
   }
 
-  const renderSection = (priority: ShopPriority, shops: DiscoveredShop[]) => {
-    if (shops.length === 0) {
+  const renderSection = (priority: ShopPriority, shops: DiscoveredShop[], showIfEmpty = false) => {
+    if (shops.length === 0 && !showIfEmpty) {
       return null
     }
     
@@ -251,21 +251,30 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
         </div>
         
         <div className="px-4 pt-4">
-          <div className="space-y-4">
-            {shops.map(renderCard)}
-          </div>
-          
-          {/* Load More Button for For You section */}
-          {priority === ShopPriority.RECOMMENDED && hasMoreRecommended && (
-            <div className="mt-6 text-center">
-              <button
-                onClick={fetchMoreRecommended}
-                disabled={recommendedLoading}
-                className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {recommendedLoading ? 'Loading...' : 'Load More Shops'}
-              </button>
+          {shops.length === 0 ? (
+            <div className="py-8 text-center text-white/80">
+              <p className="text-lg font-medium">No shops recommended for you</p>
+              <p className="text-sm opacity-80 mt-2">Try following shops or searching to discover brands you’ll love.</p>
             </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                {shops.map(renderCard)}
+              </div>
+
+              {/* Load More Button for For You section */}
+              {priority === ShopPriority.RECOMMENDED && hasMoreRecommended && (
+                <div className="mt-6 text-center">
+                  <button
+                    onClick={fetchMoreRecommended}
+                    disabled={recommendedLoading}
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {recommendedLoading ? 'Loading...' : 'Load More Shops'}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
@@ -395,7 +404,7 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
           {/* Render each section in priority order */}
           {renderSection(ShopPriority.RECENT, displayShops[ShopPriority.RECENT] || [])}
           {renderSection(ShopPriority.FOLLOWED, displayShops[ShopPriority.FOLLOWED] || [])}
-          {renderSection(ShopPriority.RECOMMENDED, displayShops[ShopPriority.RECOMMENDED] || [])}
+          {renderSection(ShopPriority.RECOMMENDED, displayShops[ShopPriority.RECOMMENDED] || [], true)}
           {renderSection(ShopPriority.POPULAR, displayShops[ShopPriority.POPULAR] || [])}
           {renderSection(ShopPriority.DISCOVERY, displayShops[ShopPriority.DISCOVERY] || [])}
         </div>
