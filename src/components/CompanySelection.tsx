@@ -1,10 +1,7 @@
 // src/components/CompanySelection.tsx
-import React, { useState, useMemo, useEffect } from 'react'
-import { useAsyncStorage, useProductSearch } from '@shopify/shop-minis-react'
+import { useShop } from '@shopify/shop-minis-react'
 import type { Company } from '../types'
 import { useShopDiscovery } from '../hooks/useShopDiscovery'
-import type { DiscoveredShop } from '../types'
-import { ShopPriority } from '../types'
 
 interface CompanySelectionProps {
   onCompanySelect: (company: Company) => void
@@ -12,409 +9,150 @@ interface CompanySelectionProps {
 }
 
 export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
-  const { getItem, setItem } = useAsyncStorage()
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [hasError, setHasError] = useState(false)
-  
+  // Try to discover YoungLA from the discovery hook first, then fetch full shop data with useShop.
   const {
-    shops: discoveredShops,
-    groupedShops,
-    loading,
-    followShop,
-    unfollowShop,
-    recordShopVisit,
-    userPreferences,
-    fetchMoreRecommended,
-    recommendedLoading,
-    hasMoreRecommended
+    shops: discoveredFilteredShops,
+    allShopsBeforeFilter,
+    loading: discoveryLoading
   } = useShopDiscovery()
 
-  // Search for popular products to use as shop images when logos are missing
-  const { products: popularProducts, loading: popularProductsLoading } = useProductSearch({
-    query: 'fashion clothing apparel',
-    first: 100,
-    includeSensitive: false
-  })
+  // Look for any discovered shop whose name includes "youngla"
+  const discoveredCandidateYoung = (allShopsBeforeFilter || []).find(s => (s.name || '').toLowerCase().includes('youngla'))
+    || (discoveredFilteredShops || []).find(s => (s.name || '').toLowerCase().includes('youngla'))
 
-  // Enhanced shops with fallback product images
-  const enhancedGroupedShops = useMemo(() => {
-    if (!popularProducts || popularProductsLoading) return groupedShops
-    
-    const enhanced: Record<string, any[]> = { ...groupedShops }
-    
-    // Ensure every priority exists so sections (like "For You") render even when empty
-    const allPriorities = [
-      ShopPriority.RECOMMENDED,
-      ShopPriority.FOLLOWED,
-      ShopPriority.RECENT,
-      ShopPriority.POPULAR,
-      ShopPriority.DISCOVERY,
-    ]
-    allPriorities.forEach((p) => {
-      if (!enhanced[p]) enhanced[p] = []
-    })
-    
-    // Create a map of shop ID to product images
-    const shopProductImages = new Map<string, string>()
-    popularProducts.forEach((product: any) => {
-      const shopId = product.shop?.id
-      const imageUrl = product.featuredImage?.url
-      if (shopId && imageUrl && !shopProductImages.has(shopId)) {
-        shopProductImages.set(shopId, imageUrl)
-      }
-    })
-    
-    // Enhance each shop category
-    allPriorities.forEach((priority) => {
-      enhanced[priority] = (enhanced[priority] || []).map((shop) => ({
-        ...shop,
-        logo: shop.logo || shopProductImages.get(shop.id) || ''
-      }))
-    })
-    
-    return enhanced
-  }, [groupedShops, popularProducts, popularProductsLoading])
+  // Look for Comfrt
+  const discoveredShopIdYoung = discoveredCandidateYoung?.id
 
-  // Error boundary - if anything crashes, show fallback
-  if (hasError) {
+  // Look for Fear of God (match common variants)
+  // Only call useShop for YoungLA when we have an id (skip otherwise)
+  const { shop: shopYoung, loading: shopLoadingYoung, error: shopErrorYoung, refetch: refetchYoung } = useShop({ id: discoveredShopIdYoung ?? '', skip: !discoveredShopIdYoung })
+
+  // Note: selection handled later using resolvedShop
+
+  // Themed header colors and imagery can be pulled from either shop when available
+  const primaryBg = (shopYoung as any)?.brandSettings?.primary || '#550cff'
+
+  const anyLoading = (discoveryLoading && !discoveredShopIdYoung) || shopLoadingYoung
+
+  if (anyLoading && !shopYoung && !discoveredCandidateYoung) {
     return (
-      <div className="min-h-screen bg-[#550cff] flex flex-col items-center justify-center">
-        <div className="text-white text-center">
-          <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
-          <p className="mb-4">The shop selection encountered an error</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
-          >
-            Reload Page
-          </button>
+      <div className="min-h-screen flex flex-col" style={{ background: primaryBg }}>
+        <header className="px-4 pt-12 pb-4 text-center">
+          <h1 className="text-2xl font-extrabold text-white">Select Shop</h1>
+          <p className="text-sm text-white/80">Loading shop...</p>
+        </header>
+
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p>Loading shop details...</p>
+          </div>
         </div>
       </div>
     )
   }
 
-  // Debounce user input for better performance
-  useEffect(() => {
-    try {
-      const timer = setTimeout(() => {
-        setDebouncedQuery(searchQuery)
-      }, 300)
-      
-      return () => clearTimeout(timer)
-    } catch (error) {
-      console.error('Error in debounce effect:', error)
-      setHasError(true)
-      return () => {} // Return cleanup function even in error case
-    }
-  }, [searchQuery])
-
-  // User-initiated search using product search to find shops
-  const { products: searchProducts, loading: searchLoading } = useProductSearch({
-    query: debouncedQuery ? `${debouncedQuery} fashion clothing apparel` : '',
-    first: 50,
-    includeSensitive: false
-  })
-
-  // Extract shops from search results (only when user is actively searching)
-  const searchShops = useMemo(() => {
-    try {
-      if (!searchProducts || !debouncedQuery.trim()) return []
-      
-      const shopMap = new Map<string, DiscoveredShop>()
-      
-      searchProducts.forEach((product: any) => {
-        try {
-          const shopId = product.shop?.id
-          const shopName = product.shop?.name
-          
-          if (!shopId || !shopName) return
-          
-          if (!shopMap.has(shopId)) {
-            shopMap.set(shopId, {
-              id: shopId,
-              name: shopName,
-              logo: product.featuredImage?.url || '',
-              description: `Found via search: ${debouncedQuery}`,
-              priority: ShopPriority.DISCOVERY,
-              reason: 'Search result'
-            })
-          }
-        } catch (productError) {
-          console.error('Error processing product:', productError)
-        }
-      })
-      
-      return Array.from(shopMap.values()).sort((a, b) => a.name.localeCompare(b.name))
-    } catch (error) {
-      console.error('Error in searchShops:', error)
-      return []
-    }
-  }, [searchProducts, debouncedQuery])
-
-  // Combine discovered shops with search results for display
-  const displayShops = useMemo(() => {
-    if (debouncedQuery.trim()) {
-      // When searching, show search results first, then discovered shops
-      const merged = { ...enhancedGroupedShops }
-      
-      // Add search results to DISCOVERY section, but avoid duplicates
-      const existingDiscovery = enhancedGroupedShops[ShopPriority.DISCOVERY] || []
-      
-      merged[ShopPriority.DISCOVERY] = [...searchShops, ...existingDiscovery]
-      
-      return merged
-    } else {
-      // When not searching, show enhanced discovered shops only
-      return enhancedGroupedShops
-    }
-  }, [debouncedQuery, searchShops, enhancedGroupedShops]) as Record<ShopPriority, DiscoveredShop[]>
-
-  const handleSelect = async (shop: DiscoveredShop) => {
-    // Record the shop visit
-    await recordShopVisit(shop.id)
-    
-    // Record click for trending algorithm
-    const raw = await getItem({ key: 'brandClicks' })
-    let clicks: Record<string, number> = {}
-    try { clicks = raw ? JSON.parse(String(raw)) : {} } catch { clicks = {} }
-    clicks[shop.id] = (clicks[shop.id] ?? 0) + 1
-    await setItem({ key: 'brandClicks', value: JSON.stringify(clicks) })
-    
-    // Call the original selection handler to go directly to clothing selection
-    onCompanySelect(shop)
-  }
-
-  const handleFollowToggle = async (shop: DiscoveredShop, event: React.MouseEvent) => {
-    event.stopPropagation() // Prevent shop selection when clicking follow button
-    
-    if (userPreferences.followedShops.includes(shop.id)) {
-      await unfollowShop(shop.id)
-    } else {
-      await followShop(shop.id)
-    }
-  }
-
-  const getSectionTitle = (priority: ShopPriority) => {
-    const titles = {
-      [ShopPriority.RECOMMENDED]: 'For You',
-      [ShopPriority.FOLLOWED]: 'Shops You Follow',
-      [ShopPriority.RECENT]: 'Recently Visited',
-      [ShopPriority.POPULAR]: 'Trending Shops',
-      [ShopPriority.DISCOVERY]: 'Discover New Brands'
-    }
-    return titles[priority]
-  }
-
-  const renderCard = (shop: DiscoveredShop) => {
-    const isFollowed = userPreferences.followedShops.includes(shop.id)
-    
-    // Tile-like card (matches ClothingSelection visual style):
+  if ((shopErrorYoung && discoveredShopIdYoung) || (!discoveredShopIdYoung && !discoveryLoading)) {
     return (
-      <div key={shop.id} className="relative">
-        <div
-          onClick={() => handleSelect(shop)}
-          className="w-full cursor-pointer rounded-lg p-2 border border-white bg-white/5 hover:bg-white/10 transition-all duration-200 hover:scale-105 active:scale-95"
-        >
-          <div className="aspect-square mb-2 rounded-md overflow-hidden bg-gradient-to-br from-gray-50/50 to-gray-100/30 flex items-center justify-center">
-            {shop.logo ? (
-              <img
-                src={shop.logo}
-                alt={`${shop.name} logo`}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-10 h-10 mx-auto mb-1 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow">
-                    <span className="text-lg text-white font-bold">{shop.name.charAt(0).toUpperCase()}</span>
-                  </div>
-                </div>
+      <div className="min-h-screen flex flex-col" style={{ background: primaryBg }}>
+        <header className="px-4 pt-12 pb-4 text-center">
+          <h1 className="text-2xl font-extrabold text-white">Select Shop</h1>
+        </header>
+
+        <div className="flex-1 flex items-center justify-center px-4 text-center">
+          <div className="text-white">
+            <p className="mb-4">Unable to load the shop from Shopify.</p>
+            <div className="space-x-2">
+              <button
+                onClick={() => { refetchYoung?.(); }}
+                className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+              >
+                Retry
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+              >
+                Reload Page
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // If useShop provided a shop, prefer its rich data; otherwise fall back to discovery candidate
+  const resolvedYoung = shopYoung || discoveredCandidateYoung
+  const displayYoung = resolvedYoung as any
+  const logoYoung = displayYoung?.logoImage?.url || displayYoung?.logo || ''
+  const avgYoung = displayYoung?.reviewAnalytics?.averageRating
+  const countYoung = displayYoung?.reviewAnalytics?.reviewCount
+
+  const handleSelect = () => {
+    const selected: any = shopYoung ? shopYoung : resolvedYoung
+    const company: Company = {
+      id: selected.id,
+      name: selected.name,
+      logo: logoYoung || selected.logoImage?.url || selected.logo || '',
+      description: selected.description || ''
+    }
+
+    onCompanySelect(company)
+  }
+
+  function renderTile(display: any, logo: string, avg: number | undefined, count: number | undefined, _key: string | undefined, fallbackInitial: string) {
+    return (
+      <button
+        onClick={handleSelect}
+        className="w-full text-left bg-white/5 p-4 rounded-xl flex items-center gap-4 border border-white/80 hover:border-white shadow-sm hover:shadow-md focus:outline-none focus:ring-4 focus:ring-white/60 hover:scale-[1.01] active:scale-95 active:translate-y-1 transition-transform transition-shadow duration-150"
+      >
+        <div className="w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-white/5 flex items-center justify-center">
+          {logo ? (
+            <img src={logo} alt={display?.logoImage?.altText || display?.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-white font-bold text-xl">{(display?.name || fallbackInitial).charAt(0)}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">{display?.name || (fallbackInitial || 'SHOP')}</h2>
+            {typeof avg === 'number' && (
+              <div className="text-sm text-white/90 flex items-center gap-1">
+                <span className="font-medium">{avg.toFixed(1)}</span>
+                <span className="text-yellow-300">★</span>
               </div>
             )}
           </div>
 
-          <div className="space-y-1">
-            <h3 className="font-semibold text-white text-sm line-clamp-2">{shop.name}</h3>
-            <p className="text-white/70 text-xs">{shop.reason}</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+          {typeof count === 'number' && (
+            <p className="text-sm text-white/70 mt-1">{count} review{count !== 1 ? 's' : ''}</p>
+          )}
 
-  const renderSection = (priority: ShopPriority, shops: DiscoveredShop[], showIfEmpty = false) => {
-    if (shops.length === 0 && !showIfEmpty) {
-      return null
-    }
-    
-    return (
-      <section key={priority} className="mb-4">
-        <div className="sticky top-0 z-10 bg-[#550cff] px-4 py-2 border-b border-white/10">
-          <h2 className="text-xl font-bold text-white">{getSectionTitle(priority)}</h2>
-          <p className="text-sm text-white/70">{shops.length} shop{shops.length !== 1 ? 's' : ''}</p>
-        </div>
-        
-        <div className="px-4 pt-2">
-          {shops.length === 0 ? (
-            <div className="py-8 text-center text-white/80">
-              <p className="text-lg font-medium">No shops recommended for you</p>
-              <p className="text-sm opacity-80 mt-2">Try following shops or searching to discover brands you’ll love.</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                {shops.map(renderCard)}
-              </div>
-
-              {/* Load More Button for For You section */}
-              {priority === ShopPriority.RECOMMENDED && hasMoreRecommended && (
-                <div className="mt-6 text-center">
-                  <button
-                    onClick={fetchMoreRecommended}
-                    disabled={recommendedLoading}
-                    className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {recommendedLoading ? 'Loading...' : 'Load More Shops'}
-                  </button>
-                </div>
-              )}
-            </>
+          {display?.description && (
+            <p className="text-white/80 mt-2 line-clamp-3">{display.description}</p>
           )}
         </div>
-      </section>
+      </button>
     )
   }
 
-  // Loading state
-  if ((loading || popularProductsLoading) && discoveredShops.length === 0) {
-    return (
-      <div className="min-h-screen bg-[#550cff] flex flex-col">
-        <header className="relative bg-transparent">
-          <div className="px-4 pt-12 pb-4 text-center">
-            <h1 className="text-2xl font-extrabold text-white">Select Shop</h1>
-            <p className="text-sm text-white/80">Discovering shops from Shopify...</p>
-          </div>
-        </header>
-        
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-white text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p>Loading shops from Shopify...</p>
-            <p className="text-sm opacity-80 mt-2">This may take a moment</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Empty state
-  if (!loading && discoveredShops.length === 0) {
-    return (
-      <div className="min-h-screen bg-[#550cff] flex flex-col">
-        <header className="relative bg-transparent">
-          <div className="px-4 pt-12 pb-4 text-center">
-            <h1 className="text-2xl font-extrabold text-white">Select Shop</h1>
-            <p className="text-sm text-white/80">No shops found</p>
-          </div>
-        </header>
-        
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-white text-center px-4">
-            <p className="text-lg mb-2">No shops available</p>
-            <p className="text-sm opacity-80">Unable to discover shops from Shopify at the moment</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="mt-4 px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
+  // Render both tiles stacked
   return (
-    <div className="min-h-screen bg-[#550cff] flex flex-col">
-      {/* Header matches Step 2 style (centered) */}
-      <header className="relative bg-transparent">
-        <div className="px-4 pt-12 pb-4 text-center">
-          <h1 className="text-3xl font-extrabold text-white">Select Shop</h1>
-        </div>
-        
-        {/* Search Bar */}
-        <div className="px-4 mb-3">
-          <div className="relative max-w-md mx-auto">
-            <input
-              type="text"
-              placeholder="Search for specific brands..."
-              className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/40 focus:bg-white/20 transition-all duration-200"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-          </div>
-          
-          {/* Search Results Indicator */}
-          {searchQuery.trim() && (
-            <div className="text-center mt-2">
-              {searchLoading ? (
-                <span className="text-white/80 text-sm">
-                  🔍 Searching for shops...
-                </span>
-              ) : (
-                <span className="text-white/80 text-sm">
-                  {searchShops.length > 0 
-                    ? `${searchShops.length} shop${searchShops.length !== 1 ? 's' : ''} found for "${searchQuery}"`
-                    : `No shops found for "${searchQuery}"`
-                  }
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+    <div className="min-h-screen flex flex-col" style={{ background: primaryBg }}>
+      <header className="px-4 pt-12 pb-6 text-center">
+        <h1 className="text-3xl font-extrabold text-white">Select Shop</h1>
       </header>
 
-      {/* Scrollable content with sections */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="py-2">
-          {/* Show search results if searching */}
-          {searchQuery.trim() && searchShops.length > 0 && (
-            <section className="mb-4">
-              <div className="sticky top-0 z-10 bg-[#550cff] px-4 py-2 border-b border-white/10">
-                <h2 className="text-xl font-bold text-white">Shops Found for "{searchQuery}"</h2>
-                <p className="text-sm text-white/70">{searchShops.length} shop{searchShops.length !== 1 ? 's' : ''} found</p>
-              </div>
-              <div className="px-4 pt-2">
-                <div className="grid grid-cols-2 gap-3">
-                  {searchShops.map(renderCard)}
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Show "no results" message if searching but no results */}
-          {searchQuery.trim() && searchShops.length === 0 && !searchLoading && (
-            <div className="text-center py-8">
-              <p className="text-white text-lg mb-2">No shops found for "{searchQuery}"</p>
-              <p className="text-white/70 text-sm">Try searching for: Nike, Adidas, Zara, luxury fashion, etc.</p>
-            </div>
-          )}
-
-          {/* Render each section in priority order */}
-          {renderSection(ShopPriority.RECENT, displayShops[ShopPriority.RECENT] || [])}
-          {renderSection(ShopPriority.FOLLOWED, displayShops[ShopPriority.FOLLOWED] || [])}
-          {renderSection(ShopPriority.RECOMMENDED, displayShops[ShopPriority.RECOMMENDED] || [], true)}
-          {renderSection(ShopPriority.POPULAR, displayShops[ShopPriority.POPULAR] || [])}
-          {renderSection(ShopPriority.DISCOVERY, displayShops[ShopPriority.DISCOVERY] || [])}
+      <main className="flex-1 px-4">
+  <div className="max-w-md mx-auto space-y-4">
+          {/* renderTile helper ensures identical rendering */}
+          {renderTile(displayYoung, logoYoung, avgYoung, countYoung, 'youngla', 'Y')}
         </div>
-      </div>
+      </main>
     </div>
   )
 }
