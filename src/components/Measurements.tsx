@@ -2088,7 +2088,7 @@ export function MeasurementsStepImpl({
       {/* Header - matches style of other pages */}
       <header className="relative bg-transparent">
         <div className="absolute top-4 left-4 z-10">
-          <BackButton onClick={onCancel} />
+          <BackButton onClick={onCancel} variant="minimal" iconSize={22} className="w-12 h-12" />
         </div>
 
 
