@@ -45,6 +45,9 @@ export function CameraDebugOverlay({
   const [cameraConstraints, setCameraConstraints] = useState<any>(null)
   const [debugLogs, setDebugLogs] = useState<string[]>([])
   const [isExpanded, setIsExpanded] = useState(false)
+  const [forceCpu, setForceCpu] = useState<boolean>(false)
+  const [lowRes, setLowRes] = useState<boolean>(false)
+  const [initErrors, setInitErrors] = useState<string[]>([])
 
   // Add debug logging
   const addDebugLog = useCallback((message: string) => {
@@ -55,6 +58,16 @@ export function CameraDebugOverlay({
   useEffect(() => {
     if (isVisible) {
       addDebugLog('Debug overlay opened')
+      // Load flags
+      try {
+        setForceCpu(localStorage.getItem('pose.forceCpu') === '1')
+        setLowRes(localStorage.getItem('pose.lowRes') === '1')
+      } catch {}
+      // Capture recent init errors if any (populated by the hook)
+      try {
+        const errs = (window as any).__poseInitErrors
+        if (Array.isArray(errs)) setInitErrors(errs as string[])
+      } catch {}
       
       // Get TensorFlow.js backend info
       import('@tensorflow/tfjs').then((tf) => {
@@ -162,6 +175,52 @@ export function CameraDebugOverlay({
         </div>
         
         <div className="p-4 space-y-4">
+          {/* Tuning Flags */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+            <h3 className="font-semibold text-purple-900 mb-2">🎛️ Tuning</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  const next = !forceCpu
+                  setForceCpu(next)
+                  try { localStorage.setItem('pose.forceCpu', next ? '1' : '0') } catch {}
+                  addDebugLog(`Force CPU ${next ? 'ENABLED' : 'DISABLED'}`)
+                  onForcePoseInit && onForcePoseInit()
+                }}
+                className={`px-3 py-2 rounded text-sm ${forceCpu ? 'bg-purple-600 text-white' : 'bg-white text-purple-700 border border-purple-300'}`}
+              >
+                {forceCpu ? 'CPU: ON' : 'CPU: OFF'}
+              </button>
+              <button
+                onClick={() => {
+                  const next = !lowRes
+                  setLowRes(next)
+                  try { localStorage.setItem('pose.lowRes', next ? '1' : '0') } catch {}
+                  addDebugLog(`Low-Res ${next ? 'ENABLED' : 'DISABLED'}`)
+                  onForcePoseInit && onForcePoseInit()
+                }}
+                className={`px-3 py-2 rounded text-sm ${lowRes ? 'bg-purple-600 text-white' : 'bg-white text-purple-700 border border-purple-300'}`}
+              >
+                {lowRes ? 'Low-Res: ON' : 'Low-Res: OFF'}
+              </button>
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.removeItem('pose.forceCpu')
+                    localStorage.removeItem('pose.lowRes')
+                  } catch {}
+                  setForceCpu(false)
+                  setLowRes(false)
+                  addDebugLog('Flags reset')
+                  onForcePoseInit && onForcePoseInit()
+                }}
+                className="px-3 py-2 rounded text-sm bg-white text-purple-700 border border-purple-300"
+              >
+                Reset Flags
+              </button>
+            </div>
+          </div>
+
           {/* Critical Status */}
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
             <h3 className="font-semibold text-red-900 mb-2">🚨 Critical Issues</h3>
@@ -234,6 +293,16 @@ export function CameraDebugOverlay({
                   <div>
                     <span className="font-medium">Camera:</span>
                     <div className="text-red-700 mt-1 break-words">{cameraStatus.error}</div>
+                  </div>
+                )}
+                {initErrors.length > 0 && (
+                  <div>
+                    <span className="font-medium">Init Attempts:</span>
+                    <ul className="mt-1 list-disc list-inside text-red-700 space-y-1">
+                      {initErrors.slice(-8).map((e, i) => (
+                        <li key={i} className="break-words">{e}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>

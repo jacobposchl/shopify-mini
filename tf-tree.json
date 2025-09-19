@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "name": "perfect-size",
+  "dependencies": {
+    "@tensorflow/tfjs": {
+      "version": "4.22.0",
+      "resolved": "https://registry.npmjs.org/@tensorflow/tfjs/-/tfjs-4.22.0.tgz",
+      "overridden": false
+    }
+  }
+}

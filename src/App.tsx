@@ -3,6 +3,7 @@ import { generateRecommendation } from './utils/recommendationEngine'
 import { CompanySelection } from './components/CompanySelection'
 import { ClothingSelection } from './components/ClothingSelection'
 import { HeightInputStep } from './components/HeightInputStep'
+import { PoseEstimationDemo } from './components/PoseEstimationDemo'
 import { MeasurementsStep } from './components/Measurements'
 import { FinalRecommendation } from './components/FinalRecommendation'
 
@@ -16,7 +17,8 @@ export function App() {
     setRecommendations,
     resetFlow,
     goToNextStep,
-    goToPreviousStep
+    goToPreviousStep,
+    goToStep
   } = useFlowState()
 
   // ClothingSelection now uses useProductSearch directly, so no need for this hook here
@@ -56,6 +58,10 @@ export function App() {
   const handleHeightSubmit = (height: number) => {
     setUserHeight(height)
     goToNextStep() // This will go to measurements step
+  }
+
+  const handlePoseDemo = () => {
+    goToStep('pose-demo')
   }
 
   const handleMeasurementsComplete = (measurements: any) => {
@@ -102,8 +108,16 @@ export function App() {
           <HeightInputStep
             onHeightSubmit={handleHeightSubmit}
             onBack={handleBack}
+            onPoseDemo={handlePoseDemo}
             selectedItemName={flowState.recommendations?.[0]?.item.name}
             selectedCompanyName={flowState.userPreferences.selectedCompany?.name}
+          />
+        )
+
+      case 'pose-demo':
+        return (
+          <PoseEstimationDemo
+            onBack={handleBack}
           />
         )
 

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "name": "perfect-size",
+  "dependencies": {
+    "@tensorflow-models/posenet": {
+      "version": "2.2.2",
+      "resolved": "https://registry.npmjs.org/@tensorflow-models/posenet/-/posenet-2.2.2.tgz",
+      "overridden": false
+    }
+  }
+}

@@ -130,6 +130,7 @@ export type FlowStep =
   | 'substyle-selection'
   | 'clothing-selection'
   | 'height-input'
+  | 'pose-demo'
   | 'measurements'
   | 'final-recommendation'
 

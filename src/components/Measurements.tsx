@@ -8,6 +8,7 @@ import { Logger } from '../utils/Logger'
 import { ConfidenceThreshold } from './ConfidenceThreshold'
 import { getClothingInstructions } from '../data/poseRequirements'
 import { BackButton } from './BackButton'
+import { CameraDebugOverlay } from './CameraDebugOverlay'
 
 
 // Extend Window interface to include our custom property
@@ -881,6 +882,8 @@ export function MeasurementsStepImpl({
   const [debugBufferSize, setDebugBufferSize] = useState(0)
   const [canTakeMeasurement, setCanTakeMeasurement] = useState(false)
   const [positionFeedback, setPositionFeedback] = useState<PositionFeedback | null>(null)
+  // In-app debug overlay state
+  const [showDebug, setShowDebug] = useState(false)
 
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -2070,6 +2073,44 @@ export function MeasurementsStepImpl({
     }
   }, [poseError])
 
+  // Expose lightweight debug snapshot to window for UI-only debugging
+  useEffect(() => {
+    ;(window as any).__poseUI = {
+      poseInitialized: isPoseInitialized,
+      poseLoading: isPoseLoading,
+      poseError,
+      poseResults,
+      poseStability,
+      cameraError,
+      validationProgress: validation?.progress,
+      validationIsValid: validation?.isValid,
+      measurementCount: measurementBuffer.length,
+      hasMeasurements: !!measurements,
+    }
+  }, [
+    isPoseInitialized,
+    isPoseLoading,
+    poseError,
+    poseResults,
+    poseStability,
+    cameraError,
+    validation?.progress,
+    validation?.isValid,
+    measurementBuffer.length,
+    measurements,
+  ])
+
+  // Keyboard shortcut: Shift + D to toggle debug overlay
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key.toLowerCase() === 'd') {
+        setShowDebug((s) => !s)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   // Loading overlay
   const LoadingOverlay = () => (
     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
@@ -2102,6 +2143,15 @@ export function MeasurementsStepImpl({
 
       {/* Main content */}
       <main className="relative flex-1 overflow-hidden bg-black rounded-t-3xl">
+        {/* Floating debug toggle (hidden on production builds if desired) */}
+        <div className="absolute top-2 right-2 z-[60]">
+          <button
+            onClick={() => setShowDebug((s) => !s)}
+            className="bg-black/50 text-xs text-white px-2 py-1 rounded hover:bg-black/70 border border-white/20"
+          >
+            {showDebug ? 'Close Debug' : 'Debug'}
+          </button>
+        </div>
         {/* Confidence bar */}
         <ConfidenceThreshold
           validation={validation}
@@ -2249,6 +2299,31 @@ export function MeasurementsStepImpl({
             </div>
           </div>
         )}
+
+        {/* Camera / Pose debug overlay */}
+        <CameraDebugOverlay
+          isVisible={showDebug}
+            onClose={() => setShowDebug(false)}
+            poseDetectionStatus={{
+              isInitialized: isPoseInitialized,
+              isLoading: isPoseLoading,
+              error: poseError || '',
+              poseResults: poseResults,
+            }}
+            cameraStatus={{
+              isActive: Boolean(videoRef.current?.srcObject),
+              error: cameraError || null,
+              stream: (videoRef.current?.srcObject as MediaStream) || null,
+            }}
+            videoElement={videoRef.current}
+            poseStability={poseStability}
+            onForceCameraStart={startCamera}
+            onForcePoseInit={() => {
+              if (videoRef.current) {
+                initializePose(videoRef.current).catch(() => {})
+              }
+            }}
+        />
       </main>
     </div>
   )

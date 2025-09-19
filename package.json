@@ -19,9 +19,9 @@
   "dependencies": {
     "@shopify/shop-minis-react": "0.0.34",
     "@tensorflow-models/posenet": "2.2.2",
-    "@tensorflow/tfjs": "4.22.0",
-  "react": "18.2.0",
-  "react-dom": "18.2.0"
+    "@tensorflow/tfjs": "^3.21.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
   },
   "overrides": {
     "form-data": "4.0.3",

@@ -1,4 +1,5 @@
 // src/components/CompanySelection.tsx
+import { useEffect, useRef, useState } from 'react'
 import { useShop } from '@shopify/shop-minis-react'
 import type { Company } from '../types'
 import { useShopDiscovery } from '../hooks/useShopDiscovery'
@@ -16,9 +17,27 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
     loading: discoveryLoading
   } = useShopDiscovery()
 
-  // Look for any discovered shop whose name includes "youngla"
-  const discoveredCandidateYoung = (allShopsBeforeFilter || []).find(s => (s.name || '').toLowerCase().includes('youngla'))
-    || (discoveredFilteredShops || []).find(s => (s.name || '').toLowerCase().includes('youngla'))
+  // Timeout & debug state
+  const [timedOut, setTimedOut] = useState(false)
+  const [debugSnapshot, setDebugSnapshot] = useState<any>(null)
+  const timeoutRef = useRef<number | null>(null)
+
+  // Pick target brand name(s) we prefer; can expand later
+  const targetMatch = (name: string) => {
+    const lower = (name || '').toLowerCase()
+    return lower.includes('youngla')
+  }
+
+  // Initially strict match; after timeout allow first available
+  let discoveredCandidateYoung = (allShopsBeforeFilter || []).find(s => targetMatch(s.name || ''))
+    || (discoveredFilteredShops || []).find(s => targetMatch(s.name || ''))
+
+  if (!discoveredCandidateYoung && timedOut) {
+    // Broaden: just take the first discovered filtered or original list
+    discoveredCandidateYoung = (discoveredFilteredShops && discoveredFilteredShops[0])
+      || (allShopsBeforeFilter && allShopsBeforeFilter[0])
+      || undefined
+  }
 
   // Look for Comfrt
   const discoveredShopIdYoung = discoveredCandidateYoung?.id
@@ -34,7 +53,38 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
 
   const anyLoading = (discoveryLoading && !discoveredShopIdYoung) || shopLoadingYoung
 
-  if (anyLoading && !shopYoung && !discoveredCandidateYoung) {
+  // Establish a timeout to break infinite loading after 6s
+  useEffect(() => {
+    if (!timedOut && anyLoading) {
+      timeoutRef.current = window.setTimeout(() => {
+        setTimedOut(true)
+      }, 6000)
+    }
+    return () => {
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
+    }
+  }, [anyLoading, timedOut])
+
+  // Capture debug snapshot when things change
+  useEffect(() => {
+    const snapshot = {
+      discoveryLoading,
+      shopLoadingYoung,
+      timedOut,
+      totalBefore: allShopsBeforeFilter?.length || 0,
+      filtered: discoveredFilteredShops?.length || 0,
+      discoveredShopIdYoung,
+      hasShopYoung: !!shopYoung,
+      timestamp: new Date().toISOString()
+    }
+    setDebugSnapshot(snapshot)
+    // Expose for manual inspection
+    ;(window as any).__companySelection = snapshot
+    // eslint-disable-next-line no-console
+    console.debug('[CompanySelection] Snapshot', snapshot)
+  }, [discoveryLoading, shopLoadingYoung, timedOut, allShopsBeforeFilter, discoveredFilteredShops, discoveredShopIdYoung, shopYoung])
+
+  if (anyLoading && !shopYoung && !discoveredCandidateYoung && !timedOut) {
     return (
       <div className="min-h-screen flex flex-col" style={{ background: primaryBg }}>
         <header className="px-4 pt-12 pb-4 text-center">
@@ -46,6 +96,44 @@ export function CompanySelection({ onCompanySelect }: CompanySelectionProps) {
           <div className="text-white text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
             <p>Loading shop details...</p>
+            <p className="text-xs text-white/50 mt-2">(Attempting auto-detect)</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Timed-out fallback when still nothing
+  if (timedOut && !discoveredCandidateYoung && !shopYoung) {
+    const placeholder: Company = {
+      id: 'placeholder-shop',
+      name: 'Sample Shop',
+      logo: '',
+      description: 'Placeholder shop (no matches found)'
+    }
+    return (
+      <div className="min-h-screen flex flex-col" style={{ background: primaryBg }}>
+        <header className="px-4 pt-12 pb-4 text-center">
+          <h1 className="text-2xl font-extrabold text-white">Select Shop</h1>
+          <p className="text-sm text-white/70">No matching shop found – showing placeholder.</p>
+        </header>
+        <div className="flex-1 flex items-center justify-center px-4 text-center">
+          <div className="space-y-4 text-white max-w-sm">
+            <button
+              onClick={() => onCompanySelect(placeholder)}
+              className="w-full bg-white/10 hover:bg-white/20 border border-white/30 rounded-lg p-4 transition"
+            >
+              Use Placeholder Shop
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-white/5 hover:bg-white/15 border border-white/20 rounded-lg p-3 text-sm"
+            >
+              Reload Page
+            </button>
+            <pre className="text-[10px] whitespace-pre-wrap bg-black/30 p-2 rounded max-h-40 overflow-auto text-left">
+{JSON.stringify(debugSnapshot, null, 2)}
+            </pre>
           </div>
         </div>
       </div>

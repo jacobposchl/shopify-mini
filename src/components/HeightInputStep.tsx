@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { BackButton } from './BackButton'
 
 interface HeightInputStepProps {
   onHeightSubmit: (height: number) => void
   onBack: () => void
+  onPoseDemo?: () => void // Add demo callback
   selectedItemName?: string
   selectedCompanyName?: string
 }
@@ -11,8 +12,7 @@ interface HeightInputStepProps {
 export function HeightInputStep({
   onHeightSubmit,
   onBack,
-  selectedItemName,
-  selectedCompanyName,
+  onPoseDemo,
 }: HeightInputStepProps) {
   const [heightFeet, setHeightFeet] = useState<number>(5)
   const [heightInches, setHeightInches] = useState<number>(8)
@@ -122,6 +122,16 @@ export function HeightInputStep({
               >
                 Continue to Measurements
               </button>
+
+              {/* Demo button */}
+              {onPoseDemo && (
+                <button
+                  onClick={onPoseDemo}
+                  className="w-full bg-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-purple-700 transition-colors"
+                >
+                  🧪 Test Pose Detection
+                </button>
+              )}
             </div>
           </div>
         </div>
